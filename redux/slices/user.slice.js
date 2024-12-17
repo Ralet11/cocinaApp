@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   userInfo: null,
   isAuthenticated: false,
-  address: null,
+  address: null, // Aquí guardaremos la ubicación actual del usuario
   addresses: [],
 };
 
@@ -12,7 +12,7 @@ const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action) => {
-      state.userInfo = action.payload; // Guarda el usuario y el token
+      state.userInfo = action.payload;
       state.isAuthenticated = true;
     },
     clearUser: (state) => {
@@ -27,8 +27,13 @@ const userSlice = createSlice({
       state.address = null;
       state.addresses = [];
     },
+    setUserLocation: (state, action) => {
+      // Aquí guardamos la latitud y longitud en address
+      const { latitude, longitude } = action.payload;
+      state.address = { latitude, longitude };
+    },
   },
 });
 
-export const { setUser, clearUser, logout } = userSlice.actions;
+export const { setUser, clearUser, logout, setUserLocation } = userSlice.actions;
 export default userSlice.reducer;

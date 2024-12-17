@@ -13,8 +13,11 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import { useSelector } from 'react-redux'; // Para obtener la dirección del usuario
+import { useSelector, useDispatch } from 'react-redux'; 
 import { API_URL } from '@env';
+import axios from 'react-native-axios';
+import { setUserLocation } from '../redux/slices/user.slice';
+
 const FEATURED_DATA = [
   { id: '1', name: 'Italiana', icon: 'pasta' },
   { id: '2', name: 'Japonesa', icon: 'food-sushi' },
@@ -24,13 +27,16 @@ const FEATURED_DATA = [
 
 const Dashboard = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const [nearbyItems, setNearbyItems] = useState([]);
   const [partner, setPartner] = useState(null);
   const [locationText, setLocationText] = useState('Ubicación Actual');
   const [loading, setLoading] = useState(true);
 
-  // Obtener la dirección del usuario desde el estado global
+  // Seleccionamos la dirección (ubicación) del usuario del estado global
   const userAddress = useSelector(state => state.user.address);
+
+  console.log(userAddress)
 
   const handleProductClick = (item) => {
     navigation.getParent().navigate('ProductDetail', { product: item });
@@ -38,33 +44,19 @@ const Dashboard = () => {
 
   const fetchData = async (lat, lng) => {
     try {
-      // Primero obtener el partner más cercano enviando la dirección del usuario y su ubicación
-      const closestPartnerResponse = await fetch(`${API_URL}/closest`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          address: userAddress, 
-          userLat: lat, 
-          userLng: lng 
-        })
+      // Enviamos lat y lng del usuario y la dirección (ahora es lat/lng) para obtener el partner más cercano
+      const closestPartnerResponse = await axios.post(`${API_URL}/closest`, {
+        address: userAddress, // { latitude, longitude }
+        userLat: lat,
+        userLng: lng,
       });
-
-      if (!closestPartnerResponse.ok) {
-        throw new Error('No se pudo obtener el partner más cercano');
-      }
-
-      const closestPartnerData = await closestPartnerResponse.json();
+      
+      const closestPartnerData = closestPartnerResponse.data;
       setPartner(closestPartnerData);
 
-      // Ahora obtener los productos de este partner
-      const productsResponse = await fetch(`http://tu-backend.com/api/partner/${closestPartnerData.id}/products`);
-      if (!productsResponse.ok) {
-        throw new Error('No se pudieron obtener los productos');
-      }
-
-      const productsData = await productsResponse.json();
+      // Ahora obtenemos los productos de este partner
+      const productsResponse = await axios.get(`${API_URL}/${closestPartnerData.id}/products`);
+      const productsData = productsResponse.data;
       setNearbyItems(productsData);
 
     } catch (error) {
@@ -86,6 +78,10 @@ const Dashboard = () => {
       const location = await Location.getCurrentPositionAsync({});
       if (location) {
         const { latitude, longitude } = location.coords;
+
+        // Guardamos la ubicación del usuario en el store de Redux
+        dispatch(setUserLocation({ latitude, longitude }));
+
         setLocationText(`Lat: ${latitude.toFixed(3)}, Lng: ${longitude.toFixed(3)}`);
         fetchData(latitude, longitude);
       } else {

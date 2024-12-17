@@ -18,8 +18,9 @@ import { API_URL } from '@env';
 
 
 const Login = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('ramiro@gmail.com');
+  const [password, setPassword] = useState('123456');
+/*   const password = "" */
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const dispatch = useDispatch();
@@ -104,6 +105,7 @@ const Login = ({ navigation }) => {
         </View>
 
         {/* Formulario */}
+        <View> </View>
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <TextInput
