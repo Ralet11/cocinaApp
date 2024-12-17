@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   StyleSheet,
   SafeAreaView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-
+import * as Location from 'expo-location';
+import { useSelector } from 'react-redux'; // Para obtener la dirección del usuario
+import { API_URL } from '@env';
 const FEATURED_DATA = [
   { id: '1', name: 'Italiana', icon: 'pasta' },
   { id: '2', name: 'Japonesa', icon: 'food-sushi' },
@@ -19,51 +22,87 @@ const FEATURED_DATA = [
   { id: '4', name: 'Postres', icon: 'cake' },
 ];
 
-const NEARBY_ITEMS = [
-  {
-    id: '1',
-    name: 'Pizza Pepperoni',
-    restaurant: 'Pizza House',
-    rating: '4.8',
-    time: '20-30 min',
-    image: '/placeholder.svg?height=200&width=200',
-    description: 'Pizza clásica de pepperoni con queso mozzarella y salsa de tomate.',
-  },
-  {
-    id: '2',
-    name: 'Veggie Supreme',
-    restaurant: 'Green Bites',
-    rating: '4.5',
-    time: '15-25 min',
-    image: '/placeholder.svg?height=200&width=200',
-    description: 'Pizza vegetariana con una mezcla de verduras frescas y queso.',
-  },
-  {
-    id: '3',
-    name: 'Hamburguesa Clásica',
-    restaurant: 'Burger Joint',
-    rating: '4.7',
-    time: '25-35 min',
-    image: '/placeholder.svg?height=200&width=200',
-    description: 'Jugosa hamburguesa con queso cheddar, lechuga y tomate.',
-  },
-  {
-    id: '4',
-    name: 'Ensalada Fresca',
-    restaurant: 'Healthy Bowl',
-    rating: '4.6',
-    time: '10-20 min',
-    image: '/placeholder.svg?height=200&width=200',
-    description: 'Ensalada mixta con ingredientes frescos y aderezo ligero.',
-  },
-];
-
 const Dashboard = () => {
   const navigation = useNavigation();
+  const [nearbyItems, setNearbyItems] = useState([]);
+  const [partner, setPartner] = useState(null);
+  const [locationText, setLocationText] = useState('Ubicación Actual');
+  const [loading, setLoading] = useState(true);
+
+  // Obtener la dirección del usuario desde el estado global
+  const userAddress = useSelector(state => state.user.address);
 
   const handleProductClick = (item) => {
     navigation.getParent().navigate('ProductDetail', { product: item });
   };
+
+  const fetchData = async (lat, lng) => {
+    try {
+      // Primero obtener el partner más cercano enviando la dirección del usuario y su ubicación
+      const closestPartnerResponse = await fetch(`${API_URL}/closest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          address: userAddress, 
+          userLat: lat, 
+          userLng: lng 
+        })
+      });
+
+      if (!closestPartnerResponse.ok) {
+        throw new Error('No se pudo obtener el partner más cercano');
+      }
+
+      const closestPartnerData = await closestPartnerResponse.json();
+      setPartner(closestPartnerData);
+
+      // Ahora obtener los productos de este partner
+      const productsResponse = await fetch(`http://tu-backend.com/api/partner/${closestPartnerData.id}/products`);
+      if (!productsResponse.ok) {
+        throw new Error('No se pudieron obtener los productos');
+      }
+
+      const productsData = await productsResponse.json();
+      setNearbyItems(productsData);
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationText('Permiso de ubicación denegado');
+        setLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      if (location) {
+        const { latitude, longitude } = location.coords;
+        setLocationText(`Lat: ${latitude.toFixed(3)}, Lng: ${longitude.toFixed(3)}`);
+        fetchData(latitude, longitude);
+      } else {
+        setLocationText('No se pudo obtener la ubicación');
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#4C1D95" />
+        <Text style={styles.loaderText}>Cargando datos...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -71,7 +110,7 @@ const Dashboard = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Icon name="map-marker" size={24} color="#4C1D95" />
-          <Text style={styles.locationText}>Ubicación Actual</Text>
+          <Text style={styles.locationText}>{locationText}</Text>
           <Icon name="chevron-down" size={24} color="#4C1D95" />
         </View>
         <TouchableOpacity style={styles.notificationButton}>
@@ -118,20 +157,20 @@ const Dashboard = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.gridContainer}>
-            {NEARBY_ITEMS.map((item) => (
+            {nearbyItems.map((item) => (
               <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => handleProductClick(item)}>
-                <Image source={{ uri: item.image }} style={styles.itemImage} />
+                <Image source={{ uri: item.img }} style={styles.itemImage} />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.restaurantName}>{item.restaurant}</Text>
+                  <Text style={styles.restaurantName}>{item.partner_name}</Text>
                   <View style={styles.itemFooter}>
                     <View style={styles.ratingContainer}>
                       <Icon name="star" size={16} color="#F59E0B" />
-                      <Text style={styles.ratingText}>{item.rating}</Text>
+                      <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
                     </View>
                     <View style={styles.timeContainer}>
                       <Icon name="clock-outline" size={16} color="#6B7280" />
-                      <Text style={styles.timeText}>{item.time}</Text>
+                      <Text style={styles.timeText}>{item.time || '20-30 min'}</Text>
                     </View>
                   </View>
                 </View>
@@ -145,6 +184,16 @@ const Dashboard = () => {
 };
 
 const styles = StyleSheet.create({
+  loaderContainer: {
+    flex:1,
+    justifyContent:'center',
+    alignItems:'center'
+  },
+  loaderText:{
+    marginTop:10,
+    fontSize:16,
+    color:'#4C1D95'
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
