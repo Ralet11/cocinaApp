@@ -45,17 +45,18 @@ const Dashboard = () => {
   const fetchData = async (lat, lng) => {
     try {
       // Enviamos lat y lng del usuario y la dirección (ahora es lat/lng) para obtener el partner más cercano
-      const closestPartnerResponse = await axios.post(`${API_URL}/closest`, {
+      const closestPartnerResponse = await axios.post(`${API_URL}/partner/closest`, {
         address: userAddress, // { latitude, longitude }
         userLat: lat,
         userLng: lng,
       });
       
-      const closestPartnerData = closestPartnerResponse.data;
-      setPartner(closestPartnerData);
+      
+      console.log(closestPartnerResponse.data.closestPartner, "Partner")
+      setPartner(closestPartnerResponse.data.closestPartner);
 
       // Ahora obtenemos los productos de este partner
-      const productsResponse = await axios.get(`${API_URL}/${closestPartnerData.id}/products`);
+      const productsResponse = await axios.get(`${API_URL}/${closestPartnerResponse.data.closestPartner.id}/products`);
       const productsData = productsResponse.data;
       setNearbyItems(productsData);
 

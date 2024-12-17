@@ -18,7 +18,7 @@ import { API_URL } from '@env';
 
 
 const Login = ({ navigation }) => {
-  const [email, setEmail] = useState('ramiro@gmail.com');
+  const [email, setEmail] = useState('chulina@gmail.com');
   const [password, setPassword] = useState('123456');
 /*   const password = "" */
   const [emailError, setEmailError] = useState(false);
