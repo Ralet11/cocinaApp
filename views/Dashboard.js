@@ -9,34 +9,30 @@ import {
   SafeAreaView,
   TextInput,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import { useSelector, useDispatch } from 'react-redux'; 
+import { useSelector, useDispatch } from 'react-redux';
 import { API_URL } from '@env';
 import axios from 'react-native-axios';
 import { setUserLocation } from '../redux/slices/user.slice';
 
-const FEATURED_DATA = [
-  { id: '1', name: 'Italiana', icon: 'pasta' },
-  { id: '2', name: 'Japonesa', icon: 'food-sushi' },
-  { id: '3', name: 'Mexicana', icon: 'taco' },
-  { id: '4', name: 'Postres', icon: 'cake' },
-];
+const { width } = Dimensions.get('window');
+const cardWidth = width * 0.7;
 
 const Dashboard = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  const [nearbyItems, setNearbyItems] = useState([]);
+  const [groupedProducts, setGroupedProducts] = useState({});
   const [partner, setPartner] = useState(null);
   const [locationText, setLocationText] = useState('Ubicación Actual');
   const [loading, setLoading] = useState(true);
 
-  // Seleccionamos la dirección (ubicación) del usuario del estado global
-  const userAddress = useSelector(state => state.user.address);
+  console.log(groupedProducts)
 
-  console.log(userAddress)
+  const userAddress = useSelector((state) => state.user.address);
 
   const handleProductClick = (item) => {
     navigation.getParent().navigate('ProductDetail', { product: item });
@@ -44,24 +40,21 @@ const Dashboard = () => {
 
   const fetchData = async (lat, lng) => {
     try {
-      // Enviamos lat y lng del usuario y la dirección (ahora es lat/lng) para obtener el partner más cercano
       const closestPartnerResponse = await axios.post(`${API_URL}/partner/closest`, {
-        address: userAddress, // { latitude, longitude }
-        userLat: lat,
-        userLng: lng,
+        address: userAddress,
       });
-      
-      
-      console.log(closestPartnerResponse.data.closestPartner, "Partner")
+
       setPartner(closestPartnerResponse.data.closestPartner);
 
-      // Ahora obtenemos los productos de este partner
-      const productsResponse = await axios.get(`${API_URL}/${closestPartnerResponse.data.closestPartner.id}/products`);
+      const productsResponse = await axios.get(
+        `${API_URL}/partner/${closestPartnerResponse.data.closestPartner.id}/products`
+      );
       const productsData = productsResponse.data;
-      setNearbyItems(productsData);
 
+      setGroupedProducts(productsData.cat || {});
     } catch (error) {
       console.error(error);
+      setGroupedProducts({});
     } finally {
       setLoading(false);
     }
@@ -80,7 +73,6 @@ const Dashboard = () => {
       if (location) {
         const { latitude, longitude } = location.coords;
 
-        // Guardamos la ubicación del usuario en el store de Redux
         dispatch(setUserLocation({ latitude, longitude }));
 
         setLocationText(`Lat: ${latitude.toFixed(3)}, Lng: ${longitude.toFixed(3)}`);
@@ -95,7 +87,7 @@ const Dashboard = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#4C1D95" />
+        <ActivityIndicator size="large" color="#6D28D9" />
         <Text style={styles.loaderText}>Cargando datos...</Text>
       </SafeAreaView>
     );
@@ -103,21 +95,19 @@ const Dashboard = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Encabezado */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Icon name="map-marker" size={24} color="#4C1D95" />
+          <Icon name="map-marker" size={24} color="#FFFFFF" />
           <Text style={styles.locationText}>{locationText}</Text>
-          <Icon name="chevron-down" size={24} color="#4C1D95" />
+          <Icon name="chevron-down" size={24} color="#FFFFFF" />
         </View>
         <TouchableOpacity style={styles.notificationButton}>
-          <Icon name="bell-outline" size={24} color="#4C1D95" />
+          <Icon name="bell-outline" size={24} color="#FFFFFF" />
           <View style={styles.notificationBadge} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Barra de búsqueda */}
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
         <View style={styles.searchContainer}>
           <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
@@ -126,55 +116,41 @@ const Dashboard = () => {
             placeholderTextColor="#9CA3AF"
           />
           <TouchableOpacity style={styles.filterButton}>
-            <Icon name="tune-vertical" size={24} color="#4C1D95" />
+            <Icon name="tune-vertical" size={24} color="#6D28D9" />
           </TouchableOpacity>
         </View>
 
-        {/* Categorías destacadas */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Radar Destacado</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredScroll}>
-            {FEATURED_DATA.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.featuredItem}>
-                <View style={styles.featuredIconContainer}>
-                  <Icon name={item.icon} size={32} color="#4C1D95" />
-                </View>
-                <Text style={styles.featuredText}>{item.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Más Cercanos */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Más Cercanos</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>Ver Todo</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.gridContainer}>
-            {nearbyItems.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => handleProductClick(item)}>
-                <Image source={{ uri: item.img }} style={styles.itemImage} />
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.restaurantName}>{item.partner_name}</Text>
-                  <View style={styles.itemFooter}>
-                    <View style={styles.ratingContainer}>
-                      <Icon name="star" size={16} color="#F59E0B" />
-                      <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
-                    </View>
-                    <View style={styles.timeContainer}>
-                      <Icon name="clock-outline" size={16} color="#6B7280" />
-                      <Text style={styles.timeText}>{item.time || '20-30 min'}</Text>
+        {Object.keys(groupedProducts).map((categoryName) => (
+          <View key={categoryName} style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>{categoryName}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredScroll}>
+              {groupedProducts[categoryName].map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.gridItem}
+                  onPress={() => handleProductClick(item)}
+                >
+                  <Image source={{ uri: item.img }} style={styles.itemImage} />
+                  <View style={styles.itemOverlay} />
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.restaurantName}>{partner?.name}</Text>
+                    <View style={styles.itemFooter}>
+                      <View style={styles.ratingContainer}>
+                        <Icon name="star" size={16} color="#F59E0B" />
+                        <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
+                      </View>
+                      <View style={styles.timeContainer}>
+                        <Icon name="clock-outline" size={16} color="#E5E7EB" />
+                        <Text style={styles.timeText}>{item.time || '20-30 min'}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-        </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,18 +158,19 @@ const Dashboard = () => {
 
 const styles = StyleSheet.create({
   loaderContainer: {
-    flex:1,
-    justifyContent:'center',
-    alignItems:'center'
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
   },
-  loaderText:{
-    marginTop:10,
-    fontSize:16,
-    color:'#4C1D95'
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6D28D9',
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F3F4F6',
   },
   header: {
     flexDirection: 'row',
@@ -201,6 +178,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: '#6D28D9',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -209,7 +189,7 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4C1D95',
+    color: '#FFFFFF',
     marginHorizontal: 8,
   },
   notificationButton: {
@@ -217,12 +197,16 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: '#EF4444',
+    top: -4,
+    right: -4,
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  content: {
+    flex: 1,
+    paddingTop: 20,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -238,108 +222,74 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 50,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
     paddingLeft: 48,
     paddingRight: 16,
     fontSize: 16,
     color: '#4B5563',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterButton: {
     marginLeft: 12,
-    width: 50,
-    height: 50,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionContainer: {
     paddingHorizontal: 20,
     marginBottom: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#4C1D95',
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: '#4C1D95',
-    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
   },
   featuredScroll: {
-    marginTop: 16,
-  },
-  featuredItem: {
-    alignItems: 'center',
-    marginRight: 24,
-  },
-  featuredIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E9D8FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  featuredText: {
-    fontSize: 14,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    overflow: 'visible',
   },
   gridItem: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
+    width: cardWidth,
+    height: 200,
+    marginRight: 16,
     borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    overflow: 'hidden',
   },
   itemImage: {
     width: '100%',
-    height: 120,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  itemOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   itemInfo: {
-    padding: 12,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   restaurantName: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#E5E7EB',
     marginBottom: 8,
   },
   itemFooter: {
@@ -354,8 +304,7 @@ const styles = StyleSheet.create({
   ratingText: {
     marginLeft: 4,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
+    color: '#FFFFFF',
   },
   timeContainer: {
     flexDirection: 'row',
@@ -364,8 +313,9 @@ const styles = StyleSheet.create({
   timeText: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#6B7280',
+    color: '#E5E7EB',
   },
 });
 
 export default Dashboard;
+
