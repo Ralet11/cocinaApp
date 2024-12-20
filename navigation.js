@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 // Importa tus componentes de pantalla
 import Login from './views/Login';
@@ -20,16 +21,46 @@ const customTheme = {
     ...DefaultTheme.colors,
     primary: '#4C1D95',
     background: '#FFFFFF',
+    card: '#F3F4F6',
+    text: '#1F2937',
+    border: '#E5E7EB',
+    notification: '#EF4444',
   },
 };
 
 function HomeTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,
-      }}
+        tabBarStyle: {
+          backgroundColor: customTheme.colors.card,
+          borderTopWidth: 0,
+          elevation: 0,
+          height: 60,
+          paddingBottom: 10,
+        },
+        tabBarActiveTintColor: customTheme.colors.primary,
+        tabBarInactiveTintColor: customTheme.colors.text,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Orders') {
+            iconName = focused ? 'list' : 'list-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={Dashboard} />
       <Tab.Screen name="Orders" component={Orders} />
@@ -57,3 +88,4 @@ export default function AppNavigation() {
     </NavigationContainer>
   );
 }
+
