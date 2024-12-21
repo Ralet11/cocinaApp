@@ -30,7 +30,9 @@ const Dashboard = () => {
   const [locationText, setLocationText] = useState('Ubicación Actual');
   const [loading, setLoading] = useState(true);
 
-  console.log(groupedProducts)
+  console.log(groupedProducts, "prod")
+
+
 
   const userAddress = useSelector((state) => state.user.address);
 
