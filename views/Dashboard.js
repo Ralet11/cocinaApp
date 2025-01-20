@@ -4,20 +4,24 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   StyleSheet,
   SafeAreaView,
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import * as Location from 'expo-location';
 import { useSelector, useDispatch } from 'react-redux';
-import { API_URL } from '@env';
 import axios from 'react-native-axios';
-import { setUserLocation } from '../redux/slices/user.slice';
+
+// Acciones de Redux
+import { setAddresses, setCurrentAddress } from "../redux/slices/user.slice";
+import { setPartnerId } from '../redux/slices/partner.slice';
+import { setHistoricOrders } from '../redux/slices/order.slice';
+
+import { API_URL } from "@env";
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.7;
@@ -25,68 +29,160 @@ const cardWidth = width * 0.7;
 const Dashboard = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+
+  // -- Estados locales --
   const [groupedProducts, setGroupedProducts] = useState({});
   const [partner, setPartner] = useState(null);
-  const [locationText, setLocationText] = useState('Ubicación Actual');
-  const [loading, setLoading] = useState(true);
 
-  console.log(groupedProducts, "prod")
+  console.log(groupedProducts, "gro")
 
+  // Control de carga general de la pantalla (partner, productos, etc.)
+  const [isScreenLoading, setIsScreenLoading] = useState(true);
+  // Control de carga específico para "addresses"
+  const [isFetchingAddresses, setIsFetchingAddresses] = useState(false);
 
+  // -- Redux: carrito, órdenes históricas, token, user_id
+  const cart = useSelector((state) => state.cart.items);
+  const historicOrders = useSelector((state) => state.order.historicOrders);
+  const token = useSelector((state) => state.user?.userInfo?.token);
+  const user_id = useSelector((state) => state.user?.userInfo?.id);
 
-  const userAddress = useSelector((state) => state.user.address);
+  // -- Redux: direcciones --
+  const addresses = useSelector((state) => state.user?.addresses);
+  const currentAddress = useSelector((state) => state.user?.currentAddress);
 
-  const handleProductClick = (item) => {
-    navigation.getParent().navigate('ProductDetail', { product: item });
-  };
-
-  const fetchData = async (lat, lng) => {
-    try {
-      const closestPartnerResponse = await axios.post(`${API_URL}/partner/closest`, {
-        address: userAddress,
-      });
-
-      setPartner(closestPartnerResponse.data.closestPartner);
-
-      const productsResponse = await axios.get(
-        `${API_URL}/partner/${closestPartnerResponse.data.closestPartner.id}/products`
-      );
-      const productsData = productsResponse.data;
-
-      setGroupedProducts(productsData.cat || {});
-    } catch (error) {
-      console.error(error);
-      setGroupedProducts({});
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 1) Al montar: cargar direcciones si es necesario
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationText('Permiso de ubicación denegado');
-        setLoading(false);
-        return;
+    const getAddresses = async () => {
+      // Si ya tenemos addresses, no las volvemos a pedir
+      if (addresses && addresses.length > 0) {
+        // Aseguramos que haya currentAddress
+        if (!currentAddress) {
+          dispatch(setCurrentAddress(addresses[0]));
+        }
+        return; // nos salimos
       }
 
-      const location = await Location.getCurrentPositionAsync({});
-      if (location) {
-        const { latitude, longitude } = location.coords;
+      // Si NO hay direcciones, las pedimos
+      setIsFetchingAddresses(true);
+      try {
+        const response = await axios.get(`${API_URL}/user/getAllAddress/${user_id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        dispatch(setUserLocation({ latitude, longitude }));
+        if (response.data.length === 0) {
+          // Si definitivamente no hay direcciones => navigate
+          navigation.navigate('FirstAddressScreen');
+        } else {
+          // Guardamos en Redux
+          dispatch(setAddresses(response.data));
 
-        setLocationText(`Lat: ${latitude.toFixed(3)}, Lng: ${longitude.toFixed(3)}`);
-        fetchData(latitude, longitude);
-      } else {
-        setLocationText('No se pudo obtener la ubicación');
-        setLoading(false);
+          // Si no hay currentAddress, definimos la primera
+          if (!currentAddress) {
+            dispatch(setCurrentAddress(response.data[0]));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching addresses:', error);
+      } finally {
+        setIsFetchingAddresses(false);
       }
-    })();
+    };
+
+    getAddresses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) {
+  // 2) Cargar órdenes históricas (solo una vez)
+  useEffect(() => {
+    const fetchHistoricOrders = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/order/getAllByUser/${user_id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        dispatch(setHistoricOrders(response.data));
+      } catch (error) {
+        console.error('Error fetching historic orders:', error);
+      }
+    };
+    fetchHistoricOrders();
+  }, [user_id, token, dispatch]);
+
+  // 3) Cada vez que tengamos (o cambie) currentAddress, pedimos el Partner más cercano
+  //    y los productos. Hasta entonces, la pantalla estará "cargando".
+  useEffect(() => {
+    const getClosestPartnerAndProducts = async () => {
+      if (!currentAddress || isFetchingAddresses) return;
+  
+      setIsScreenLoading(true);
+      try {
+        // 1) Partner más cercano
+        const resp = await axios.post(
+          `${API_URL}/partner/closest`,
+          {
+            address: {
+              latitude: currentAddress.lat,
+              longitude: currentAddress.lng,
+            },
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const closestPartner = resp.data.closestPartner;
+        setPartner(closestPartner);
+        dispatch(setPartnerId(closestPartner.id));
+  
+        // 2) Productos agrupados por categoría
+        const productsResp = await axios.get(
+          `${API_URL}/partner/${closestPartner.id}/products`,
+          {
+            headers: { Authorization: `Bearer ${token}` }, // Token incluido aquí
+          }
+        );
+        setGroupedProducts(productsResp.data.cat || {});
+      } catch (error) {
+        console.error('Error fetching partner/products:', error);
+      } finally {
+        setIsScreenLoading(false);
+      }
+    };
+  
+    getClosestPartnerAndProducts();
+  }, [currentAddress, isFetchingAddresses, dispatch]);
+  
+  // 4) Cuando la pantalla reciba "focus", si hay que refrescar direcciones, lo hacemos
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      const refresh = navigation.getParam?.('refresh', false);
+      if (refresh) {
+        setIsFetchingAddresses(true);
+        try {
+          const response = await axios.get(`${API_URL}/user/getAllAddress/${user_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (response.data.length === 0) {
+            navigation.navigate('FirstAddressScreen');
+          } else {
+            dispatch(setAddresses(response.data));
+            if (!currentAddress) {
+              dispatch(setCurrentAddress(response.data[0]));
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching addresses on focus:', error);
+        } finally {
+          setIsFetchingAddresses(false);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigation, user_id, token, dispatch, currentAddress]);
+
+  // 5) Render de carga general, si es que todavía estamos trayendo partner/productos
+  //    o si estamos pidiendo direcciones. (Opcional: puedes refinar la lógica)
+  if (isScreenLoading) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#6D28D9" />
@@ -95,21 +191,47 @@ const Dashboard = () => {
     );
   }
 
+  // --- Render principal ---
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Icon name="map-marker" size={24} color="#FFFFFF" />
-          <Text style={styles.locationText}>{locationText}</Text>
-          <Icon name="chevron-down" size={24} color="#FFFFFF" />
-        </View>
-        <TouchableOpacity style={styles.notificationButton}>
-          <Icon name="bell-outline" size={24} color="#FFFFFF" />
-          <View style={styles.notificationBadge} />
+        <Icon name="map-marker" size={24} color="#FFFFFF" />
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Addresses")}
+          style={styles.addressContainer}
+        >
+          <View style={styles.streetLine}>
+            <Text
+              style={styles.locationText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {currentAddress?.street || 'Seleccionar dirección'}
+            </Text>
+            <Icon name="chevron-down" size={24} color="#FFFFFF" />
+          </View>
+          <Text style={styles.addressType}>
+            {currentAddress?.type || ''}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.cartButton}
+          onPress={() => navigation.navigate('CartScreen')}
+        >
+          <Icon name="cart-outline" size={24} color="#FFFFFF" />
+          {cart.length > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{cart.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
+      {/* Contenido principal */}
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
+        {/* Barra de búsqueda */}
         <View style={styles.searchContainer}>
           <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
@@ -122,37 +244,44 @@ const Dashboard = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Listado de categorías y productos */}
         {Object.keys(groupedProducts).map((categoryName) => (
-          <View key={categoryName} style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>{categoryName}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredScroll}>
-              {groupedProducts[categoryName].map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.gridItem}
-                  onPress={() => handleProductClick(item)}
-                >
-                  <Image source={{ uri: item.img }} style={styles.itemImage} />
-                  <View style={styles.itemOverlay} />
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.restaurantName}>{partner?.name}</Text>
-                    <View style={styles.itemFooter}>
-                      <View style={styles.ratingContainer}>
-                        <Icon name="star" size={16} color="#F59E0B" />
-                        <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
-                      </View>
-                      <View style={styles.timeContainer}>
-                        <Icon name="clock-outline" size={16} color="#E5E7EB" />
-                        <Text style={styles.timeText}>{item.time || '20-30 min'}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+  <View key={categoryName} style={styles.sectionContainer}>
+    <Text style={styles.sectionTitle}>{categoryName}</Text>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.featuredScroll}
+    >
+      {groupedProducts[categoryName].map((item) => (
+        <TouchableOpacity
+          key={item.id}
+          style={styles.gridItem}
+          onPress={() =>
+            navigation
+              .getParent()
+              .navigate('ProductDetail', {
+                product: item,
+                isHamburger: categoryName === 'Burgers', // <-- Pass true only for Burgers
+              })
+          }
+        >
+          {/* Image */}
+          <Image source={{ uri: item.img }} style={styles.itemImage} />
+
+          {/* Dark overlay (optional) */}
+          <View style={styles.itemOverlay} />
+
+          {/* Product info (name & price) */}
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemName}>{item.name}</Text>
+            <Text style={styles.itemPrice}>${item.price}</Text>
           </View>
-        ))}
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </View>
+))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -176,35 +305,53 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#6D28D9',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  headerLeft: {
+  addressContainer: {
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 8,
+    maxWidth: '70%',
+  },
+  streetLine: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   locationText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginHorizontal: 8,
   },
-  notificationButton: {
+  addressType: {
+    fontSize: 12,
+    color: '#E5E7EB',
+    marginTop: 2,
+  },
+  cartButton: {
     position: 'relative',
   },
-  notificationBadge: {
+  badgeContainer: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: -5,
+    right: -5,
     backgroundColor: '#EF4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   content: {
     flex: 1,
@@ -257,9 +404,7 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 16,
   },
-  featuredScroll: {
-    overflow: 'visible',
-  },
+  featuredScroll: {},
   gridItem: {
     width: cardWidth,
     height: 200,
@@ -289,35 +434,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 4,
   },
-  restaurantName: {
-    fontSize: 14,
-    color: '#E5E7EB',
-    marginBottom: 8,
-  },
-  itemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
-    marginLeft: 4,
-    fontSize: 14,
+  itemPrice: {
+    fontSize: 16,
     color: '#FFFFFF',
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeText: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: '#E5E7EB',
+    fontWeight: 'bold',
+    marginTop: 4,
   },
 });
 
 export default Dashboard;
-

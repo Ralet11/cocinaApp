@@ -11,6 +11,13 @@ import Orders from './views/Orders';
 import UserSettings from './views/UserSettings';
 import Dashboard from './views/Dashboard';
 import ProductDetail from './views/ProductDetail';
+import CartScreen from './views/CartScreen';
+import OrderSummaryScreen from './views/Confirmation';
+import ProfileView from './views/Profile';
+import AddressesView from './views/Addresses';
+import SelectNewAddress from './views/SelectNewAddress';
+import FirstAddressScreen from './views/FirstAddressScreen';
+import OrderTrackingScreen from './views/OrderTracking';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -64,7 +71,7 @@ function HomeTabs() {
     >
       <Tab.Screen name="Home" component={Dashboard} />
       <Tab.Screen name="Orders" component={Orders} />
-      <Tab.Screen name="Profile" component={UserSettings} />
+      <Tab.Screen name="Profile" component={ProfileView} />
     </Tab.Navigator>
   );
 }
@@ -84,8 +91,19 @@ export default function AppNavigation() {
         <Stack.Screen name="Signup" component={Signup} />
         <Stack.Screen name="HomeTabs" component={HomeTabs} />
         <Stack.Screen name="ProductDetail" component={ProductDetail} />
+        <Stack.Screen name="CartScreen" component={CartScreen} />
+        <Stack.Screen name="ConfirmationScreen" component={OrderSummaryScreen} />
+        <Stack.Screen name="Profile" component={ProfileView} />
+        <Stack.Screen name="Addresses" component={AddressesView} />
+        <Stack.Screen name="SelectNewAddress" component={SelectNewAddress} />
+        <Stack.Screen 
+          name="FirstAddressScreen" 
+          component={FirstAddressScreen} 
+         
+        />
+             <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
       </Stack.Navigator>
+ 
     </NavigationContainer>
   );
 }
-
