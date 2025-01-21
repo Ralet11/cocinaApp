@@ -3,8 +3,8 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   userInfo: null,
   isAuthenticated: false,
-  address: null, // Aquí guardaremos la ubicación actual del usuario
-  addresses: [],
+  addresses: [], // Lista de direcciones del usuario
+  currentAddress: null, // Dirección actual seleccionada
 };
 
 const userSlice = createSlice({
@@ -18,22 +18,27 @@ const userSlice = createSlice({
     clearUser: (state) => {
       state.userInfo = null;
       state.isAuthenticated = false;
-      state.address = null;
       state.addresses = [];
+      state.currentAddress = null;
     },
     logout: (state) => {
-      state.userInfo = null;
-      state.isAuthenticated = false;
-      state.address = null;
-      state.addresses = [];
+      return { ...initialState }; // Reinicia el estado completo al inicial
     },
-    setUserLocation: (state, action) => {
-      // Aquí guardamos la latitud y longitud en address
-      const { latitude, longitude } = action.payload;
-      state.address = { latitude, longitude };
+    setAddresses: (state, action) => {
+      state.addresses = action.payload;
+    },
+    setCurrentAddress: (state, action) => {
+      state.currentAddress = action.payload;
     },
   },
 });
 
-export const { setUser, clearUser, logout, setUserLocation } = userSlice.actions;
+export const {
+  setUser,
+  clearUser,
+  logout,
+  setAddresses,
+  setCurrentAddress,
+} = userSlice.actions;
+
 export default userSlice.reducer;

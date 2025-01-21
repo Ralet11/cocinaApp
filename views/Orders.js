@@ -8,75 +8,70 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
+  Modal,
+  FlatList,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
-const ORDERS = [
-  {
-    id: '1',
-    restaurant: 'Pizza House',
-    items: ['1x Pepperoni Pizza', '1x Garlic Bread'],
-    total: '$24.99',
-    status: 'Delivered',
-    date: '2023-06-15',
-    image: '/placeholder.svg?height=80&width=80',
-  },
-  {
-    id: '2',
-    restaurant: 'Burger Joint',
-    items: ['2x Classic Burger', '1x Fries', '2x Cola'],
-    total: '$35.50',
-    status: 'In Progress',
-    date: '2023-06-14',
-    image: '/placeholder.svg?height=80&width=80',
-  },
-  {
-    id: '3',
-    restaurant: 'Sushi Palace',
-    items: ['1x California Roll', '1x Miso Soup', '1x Green Tea'],
-    total: '$28.75',
-    status: 'Delivered',
-    date: '2023-06-12',
-    image: '/placeholder.svg?height=80&width=80',
-  },
-  {
-    id: '4',
-    restaurant: 'Taco Town',
-    items: ['3x Beef Tacos', '1x Guacamole', '2x Horchata'],
-    total: '$22.50',
-    status: 'Cancelled',
-    date: '2023-06-10',
-    image: '/placeholder.svg?height=80&width=80',
-  },
-  {
-    id: '5',
-    restaurant: 'Pasta Paradise',
-    items: ['1x Spaghetti Carbonara', '1x Caesar Salad', '1x Tiramisu'],
-    total: '$42.00',
-    status: 'Delivered',
-    date: '2023-06-08',
-    image: '/placeholder.svg?height=80&width=80',
-  },
-];
+import { useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 
 const Orders = () => {
+  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const filteredOrders = ORDERS.filter(order =>
-    order.restaurant.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.items.some(item => item.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Tomamos las órdenes del store
+  const historicOrders = useSelector((state) => state.order.historicOrders);
+
+  // Filtramos por código o dirección de entrega
+  const filteredOrders = historicOrders.filter((order) => {
+    const codeMatch = order.code
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const addressMatch = order.deliveryAddress
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    return codeMatch || addressMatch;
+  });
+
+  // Separamos las órdenes en finalizadas y no finalizadas
+  const activeOrders = filteredOrders.filter(
+    (order) => order.status !== 'finalizada',
+  );
+  const finishedOrders = filteredOrders.filter(
+    (order) => order.status === 'finalizada',
   );
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Delivered':
-        return '#10B981';
-      case 'In Progress':
-        return '#F59E0B';
-      case 'Cancelled':
-        return '#EF4444';
-      default:
-        return '#6B7280';
+  // Unimos primero las activas y después las finalizadas
+  const sortedOrders = [...activeOrders, ...finishedOrders];
+
+  // Función para formatear fecha
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
+
+  // Función para abrir el modal (solo para órdenes finalizadas)
+  const openModal = (order) => {
+    setSelectedOrder(order);
+    setModalVisible(true);
+  };
+
+  // Función para cerrar el modal
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedOrder(null);
+  };
+
+  // Función para manejar el onPress según el estado de la orden
+  const handlePress = (order) => {
+    if (order.status === 'finalizada') {
+      // Órdenes finalizadas -> mostrar modal
+      openModal(order);
+    } else {
+      // Órdenes activas -> navegar a OrderTracking
+      navigation.navigate('OrderTracking', { orderId: order.id });
     }
   };
 
@@ -104,43 +99,90 @@ const Orders = () => {
 
       {/* Orders List */}
       <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-        {filteredOrders.map((order) => (
-          <TouchableOpacity key={order.id} style={styles.orderItem}>
-            <Image source={{ uri: order.image }} style={styles.orderImage} />
-            <View style={styles.orderInfo}>
-              <Text style={styles.restaurantName}>{order.restaurant}</Text>
-              <Text style={styles.orderItems}>{order.items.join(', ')}</Text>
-              <View style={styles.orderFooter}>
-                <Text style={styles.orderTotal}>{order.total}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-                  <Text style={styles.statusText}>{order.status}</Text>
+        {sortedOrders.map((order) => {
+          const isActive = order.status !== 'finalizada';
+          return (
+            <TouchableOpacity
+              key={order.id}
+              style={[
+                styles.orderItem,
+                isActive && styles.activeOrderItem, // Estilo adicional para órdenes activas
+              ]}
+              onPress={() => handlePress(order)}
+            >
+              <Image
+                source={{ uri: '/placeholder.svg?height=80&width=80' }}
+                style={styles.orderImage}
+              />
+              <View style={styles.orderInfo}>
+                <Text style={styles.orderTitle}>{order.code || 'Sin código'}</Text>
+                <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
+                <Text style={styles.orderStatus}>
+                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                </Text>
+                <View style={styles.orderFooter}>
+                  <Text style={styles.orderTotal}>${order.finalPrice}</Text>
                 </View>
               </View>
-            </View>
-            <Text style={styles.orderDate}>{order.date}</Text>
-          </TouchableOpacity>
-        ))}
+              <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="home-outline" size={24} color="#6B7280" />
-          <Text style={styles.navTextInactive}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="compass-outline" size={24} color="#6B7280" />
-          <Text style={styles.navTextInactive}>Explore</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="clipboard-text" size={24} color="#4C1D95" />
-          <Text style={styles.navText}>Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="account-outline" size={24} color="#6B7280" />
-          <Text style={styles.navTextInactive}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Modal para mostrar detalles de la orden finalizada */}
+      {selectedOrder && (
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Order Details</Text>
+              <Text style={styles.modalText}>
+                Address: {selectedOrder.deliveryAddress}
+              </Text>
+              <Text style={styles.modalText}>
+                Status:{' '}
+                {selectedOrder.status.charAt(0).toUpperCase() +
+                  selectedOrder.status.slice(1)}
+              </Text>
+              <Text style={styles.modalText}>
+                Total: ${selectedOrder.finalPrice}
+              </Text>
+
+              <Text style={styles.modalSubtitle}>Products:</Text>
+              <FlatList
+                data={selectedOrder.order_products}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.productItem}>
+                    <Image
+                      source={{ uri: item.product.img }}
+                      style={styles.productImage}
+                    />
+                    <View style={styles.productInfo}>
+                      <Text style={styles.productName}>{item.product.name}</Text>
+                      <Text style={styles.productDescription}>
+                        {item.product.description}
+                      </Text>
+                      <Text style={styles.productPrice}>
+                        ${item.product.price} x {item.quantity}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              />
+
+              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
@@ -193,6 +235,7 @@ const styles = StyleSheet.create({
   },
   ordersList: {
     paddingHorizontal: 20,
+    marginBottom: 16,
   },
   orderItem: {
     flexDirection: 'row',
@@ -200,7 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -208,6 +251,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 3,
+  },
+  // Estilo adicional para las órdenes activas
+  activeOrderItem: {
+    borderWidth: 1,
+    borderColor: '#10B981', // un verde suave, por ejemplo
+    backgroundColor: '#ECFDF5', // un fondo suave para destacar
   },
   orderImage: {
     width: 80,
@@ -218,15 +267,21 @@ const styles = StyleSheet.create({
   orderInfo: {
     flex: 1,
   },
-  restaurantName: {
-    fontSize: 18,
+  orderTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#4B5563',
     marginBottom: 4,
   },
-  orderItems: {
+  orderAddress: {
     fontSize: 14,
     color: '#6B7280',
+    marginBottom: 8,
+  },
+  orderStatus: {
+    fontSize: 14,
+    color: '#4C1D95',
+    fontWeight: '500',
     marginBottom: 8,
   },
   orderFooter: {
@@ -239,16 +294,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4C1D95',
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
   orderDate: {
     position: 'absolute',
     top: 16,
@@ -256,29 +301,74 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 20,
   },
-  navItem: {
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4C1D95',
+    marginBottom: 16,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#4B5563',
+  },
+  modalSubtitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#4C1D95',
+  },
+  productItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 16,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4B5563',
+  },
+  productDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  productPrice: {
+    fontSize: 14,
+    color: '#4C1D95',
+  },
+  closeButton: {
+    marginTop: 16,
+    backgroundColor: '#4C1D95',
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  navText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#4C1D95',
-    fontWeight: '500',
-  },
-  navTextInactive: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#6B7280',
+  closeButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
 export default Orders;
-

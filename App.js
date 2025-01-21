@@ -2,22 +2,28 @@ import React from 'react';
 import { SafeAreaView, StyleSheet, StatusBar } from 'react-native';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-
+import Toast from 'react-native-toast-message'; // Importa el Toast
+import { StripeProvider } from '@stripe/stripe-react-native';
 import AppNavigation from './navigation';
 import { store, persistor } from './redux/store'; // Ajusta la ruta si es necesario
+import toastConfig from './components/toastConfig';
+import 'react-native-get-random-values';
 
 export default function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
+      <StripeProvider publishableKey="pk_test_51OJV6vCtqRjqS5ch2BT38s88U8qgkJeqWLZ8ODgOfB95sfshzLQw8gvkcmu4yplXKbuL8nnO85We2r1Ie7nYQkue00FX8swMRF">
         <SafeAreaView style={styles.safeArea}>
           <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
           <AppNavigation />
+          <Toast />
         </SafeAreaView>
+        </StripeProvider>
       </PersistGate>
     </Provider>
   );
-} 
+}
 
 const styles = StyleSheet.create({
   safeArea: {

@@ -105,7 +105,7 @@ const Signup = ({ navigation }) => {
             <View style={styles.iconContainer}>
               <Icon name="rocket" size={40} color="#4C1D95" />
             </View>
-            <Text style={styles.title}>Welcome to MoonMail</Text>
+            <Text style={styles.title}>Welcome</Text>
             <Text style={styles.subtitle}>Create an account to get started</Text>
           </View>
 

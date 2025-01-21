@@ -20,23 +20,23 @@ import { API_URL } from '@env';
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('ramiro@gmail.com');
   const [password, setPassword] = useState('123456');
-/*   const password = "" */
+
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const dispatch = useDispatch();
 
-  // Validación de email con regex
+
   const isValidEmail = (value) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(value);
   };
 
   const handleSignIn = async () => {
-    // Reiniciar errores
+    
     setEmailError(false);
     setPasswordError(false);
 
-    // Validaciones
+  
     if (!email || !isValidEmail(email)) {
       setEmailError(true);
       Toast.show({
@@ -57,20 +57,19 @@ const Login = ({ navigation }) => {
       return;
     }
 
-    // Datos válidos
+  
     const data = { email, password };
 
     try {
-      // Llamada al backend para autenticar al usuario
+  
       const response = await axios.post(`${API_URL}/user/login`, data);
 
       if (response.status === 200) {
         const { user, token } = response.data;
 
-        // Guardar el usuario y token en Redux
         dispatch(setUser({ ...user, token }));
 
-        // Navegar a la pantalla principal
+       
         navigation.navigate('HomeTabs');
       } else {
         Toast.show({
@@ -95,7 +94,7 @@ const Login = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-        {/* Encabezado */}
+     
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <Icon name="rocket" size={40} color="#4C1D95" />
@@ -104,14 +103,14 @@ const Login = ({ navigation }) => {
           <Text style={styles.subtitle}>Log in to your account to continue</Text>
         </View>
 
-        {/* Formulario */}
+       
         <View> </View>
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <TextInput
               style={[
                 styles.input,
-                emailError && styles.inputError, // Aplicar borde rojo si hay error
+                emailError && styles.inputError, 
               ]}
               placeholder="john@email.com"
               placeholderTextColor="#9CA3AF"
@@ -126,7 +125,7 @@ const Login = ({ navigation }) => {
             <TextInput
               style={[
                 styles.input,
-                passwordError && styles.inputError, // Aplicar borde rojo si hay error
+                passwordError && styles.inputError, 
               ]}
               placeholder="Password"
               placeholderTextColor="#9CA3AF"
@@ -136,17 +135,16 @@ const Login = ({ navigation }) => {
             />
           </View>
 
-          {/* Botón de Olvidar Contraseña */}
           <TouchableOpacity style={styles.forgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
           </TouchableOpacity>
 
-          {/* Botón de Iniciar Sesión */}
+      
           <TouchableOpacity style={styles.button} onPress={handleSignIn}>
             <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
 
-          {/* Enlace a la página de registro */}
+       
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => navigation.navigate('Signup')}
@@ -158,7 +156,7 @@ const Login = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      {/* Toast */}
+   
       <Toast />
     </SafeAreaView>
   );
