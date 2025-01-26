@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'react-native-axios';
-
+import socketIOClient from "socket.io-client";
 // Acciones de Redux
 import { setAddresses, setCurrentAddress } from "../redux/slices/user.slice";
 import { setPartnerId } from '../redux/slices/partner.slice';
@@ -179,6 +179,8 @@ const Dashboard = () => {
     });
     return unsubscribe;
   }, [navigation, user_id, token, dispatch, currentAddress]);
+
+
 
   // 5) Render de carga general, si es que todavía estamos trayendo partner/productos
   //    o si estamos pidiendo direcciones. (Opcional: puedes refinar la lógica)

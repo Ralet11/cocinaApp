@@ -10,18 +10,22 @@ import {
   BackHandler,
   Image,
 } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'react-native-axios';
-
-import { OrderStatusTracker } from '../components/OrderTracker';
+import socket from '../config/socket'; // Importa el socket configurado
+import { updateOrderState } from '../redux/slices/order.slice'; // Acción de Redux
+import socketIOClient from "socket.io-client";
+import { OrderStatusTracker } from '../components/OrderTracker'; // Componente de tracking
 import { API_URL } from '@env';
 
 export default function OrderTrackingScreen() {
   const route = useRoute();
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const { orderId } = route.params;
+
 
   const orders = useSelector((state) => state.order.activeOrders);
   const order = orders.find((o) => o.id === orderId);
@@ -30,6 +34,9 @@ export default function OrderTrackingScreen() {
   const [expandedItems, setExpandedItems] = useState({});
   const [loading, setLoading] = useState(false);
 
+  console.log(order, "order")
+
+  // Manejar el botón de retroceso para navegar a HomeTabs
   useEffect(() => {
     const backAction = () => {
       navigation.navigate('HomeTabs');
@@ -44,6 +51,7 @@ export default function OrderTrackingScreen() {
     return () => backHandler.remove();
   }, [navigation]);
 
+  // Cargar los productos de la orden al montar el componente
   useEffect(() => {
     const fetchOrderProducts = async () => {
       try {
@@ -62,6 +70,36 @@ export default function OrderTrackingScreen() {
     fetchOrderProducts();
   }, [orderId]);
 
+  // Escuchar cambios en el estado de la orden mediante WebSocket
+  useEffect(() => {
+    const socket = socketIOClient("http://192.168.0.251:3000", {
+      transports: ["websocket"],
+    });
+  
+    // Confirmar conexión
+    socket.on("connect", () => {
+      console.log("Conectado al socket con ID:", socket.id);
+    });
+  
+    // Escuchar el evento personalizado
+    socket.on("state changed", (data) => {
+      console.log("Evento 'state changed' recibido:", data);
+      // Puedes usar `data` para actualizar Redux o el estado local
+    });
+  
+    // Manejar errores
+    socket.on("connect_error", (err) => {
+      console.error("Error al conectar al socket:", err);
+    });
+  
+    // Limpieza al desmontar el componente
+    return () => {
+      socket.disconnect();
+      console.log("Socket desconectado.");
+    };
+  }, []);
+
+  // Expandir o contraer los detalles de un producto
   const toggleItemExpansion = (itemId) => {
     setExpandedItems((prev) => ({
       ...prev,
@@ -69,6 +107,7 @@ export default function OrderTrackingScreen() {
     }));
   };
 
+  // Renderizar los ingredientes (incluidos o extras)
   const renderIngredients = (title, ingredients = []) => {
     if (!ingredients.length) return null;
     return (
@@ -89,6 +128,7 @@ export default function OrderTrackingScreen() {
     );
   };
 
+  // Renderizar los productos de la orden
   const renderOrderItems = () => {
     if (!orderProducts || !orderProducts.length) {
       return (
@@ -176,14 +216,13 @@ export default function OrderTrackingScreen() {
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Tracking</Text>
-        {/* Espacio para centrar el título */}
         <View style={{ width: 24, height: 24 }} />
       </View>
 
       {/* Contenido */}
       <ScrollView contentContainerStyle={styles.contentContainer}>
         {/* Tracker de estatus */}
-        <OrderStatusTracker currentStatus={order.status || 'Pending'} />
+        <OrderStatusTracker currentStatus={order.state || 'Pending'} />
 
         {/* Detalles de la orden */}
         <View style={styles.card}>
@@ -211,14 +250,6 @@ export default function OrderTrackingScreen() {
           <Text style={styles.cardTitle}>Items</Text>
           {renderOrderItems()}
         </View>
-
-        {/* Botón para regresar a Home */}
-        <TouchableOpacity
-          style={styles.goBackButton}
-          onPress={() => navigation.navigate('HomeTabs')}
-        >
-          <Text style={styles.goBackButtonText}>Go Back to Home</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -281,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     fontWeight: '500',
-    maxWidth: '60%', // Para evitar que se salga de los límites
+    maxWidth: '60%',
   },
   infoText: {
     fontSize: 16,
@@ -314,7 +345,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     fontWeight: '600',
-    maxWidth: 200, // Limite para evitar desbordes
+    maxWidth: 200,
   },
   itemPrice: {
     fontSize: 14,
@@ -350,18 +381,5 @@ const styles = StyleSheet.create({
   ingredientPrice: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  goBackButton: {
-    marginTop: 16,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goBackButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

@@ -146,7 +146,6 @@ export default function CartScreen({ navigation }) {
       setCurrentOrder({
         user_id,
         partner_id,
-        // Podrías poner un deliveryFee por defecto o calcularlo aparte
         price: totalGeneral, // Subtotal
       })
     );

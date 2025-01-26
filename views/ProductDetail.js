@@ -121,23 +121,30 @@ export default function ProductDetail({ route }) {
   const handleAddToCart = () => {
     const basePrice = calculateBasePrice();
     const totalPrice = basePrice * quantity;
-
-    // If not a burger, included/extra arrays are empty
+    
+    // Determinar los ingredientes eliminados como objetos completos
+    const removedIngredients = isHamburger
+      ? includedIngredients.filter((ing) => !selectedIncluded.includes(ing.id))
+      : [];
+    
+    // Ingredientes finales seleccionados
     const finalIncludedIngredients = isHamburger
       ? includedIngredients.filter((ing) => selectedIncluded.includes(ing.id))
       : [];
     const finalExtraIngredients = isHamburger
       ? extraIngredients.filter((ing) => selectedExtras.includes(ing.id))
       : [];
-
-    // Build a unique ID for the cart item
+    
+    // Crear un ID único para el carrito
     const uniqueId = [
       product.id,
       isHamburger ? selectedOption : '',
       isHamburger ? selectedIncluded.sort().join(',') : '',
       isHamburger ? selectedExtras.sort().join(',') : '',
+      removedIngredients.map((ing) => ing.id).sort().join(','), // Solo IDs para el ID único
     ].join('-');
-
+    
+    // Crear el objeto del carrito
     const cartItem = {
       id: uniqueId,
       productId: product.id,
@@ -145,14 +152,17 @@ export default function ProductDetail({ route }) {
       option: isHamburger ? selectedOption : null,
       includedIngredients: finalIncludedIngredients,
       extraIngredients: finalExtraIngredients,
+      removedIngredients: removedIngredients, // Guardar objetos completos
       quantity,
       pricePerUnit: parseFloat(basePrice.toFixed(2)),
       totalPrice: parseFloat(totalPrice.toFixed(2)),
       image: product.img,
     };
-
+    
+    // Agregar al carrito en Redux
     dispatch(addItem(cartItem));
-
+    
+    // Mostrar mensaje de éxito
     Toast.show({
       type: 'success',
       text1: 'Product added',
@@ -161,7 +171,7 @@ export default function ProductDetail({ route }) {
       visibilityTime: 2000,
       bottomOffset: 100,
     });
-
+    
     setIsAdding(true);
     setTimeout(() => setIsAdding(false), 2000);
   };
