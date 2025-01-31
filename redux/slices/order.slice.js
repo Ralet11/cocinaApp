@@ -1,110 +1,104 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// Estado inicial
 const initialState = {
-  // Orden actual que se está siguiendo o editando
   currentOrder: {
+    id: null,
     user_id: null,
     partner_id: null,
     price: 0,
     finalPrice: 0,
     deliveryFee: 0,
     deliveryAddress: '',
-    code: '',
-    items: [], // Detalles de los productos
-    state: 'pending', // Estado inicial de la orden
+    items: [],
+    status: 'pendiente',
   },
-
-  // Lista de órdenes activas
-  activeOrders: [],
-
-  // Lista de órdenes históricas
   historicOrders: [],
+  activeOrders: [], // ← Añade esta propiedad para almacenar las órdenes "activas"
 };
 
-// Creación del slice
 const orderSlice = createSlice({
   name: 'order',
   initialState,
-
-  // Reducers para manejar acciones del slice
   reducers: {
-    // Actualiza los datos de la orden actual (mezclando los nuevos campos con los existentes)
     setCurrentOrder: (state, action) => {
       state.currentOrder = {
         ...state.currentOrder,
         ...action.payload,
       };
     },
-
-    // Establece los items de la orden actual
     setOrderItems: (state, action) => {
       state.currentOrder.items = action.payload;
     },
-
-    // Limpia los datos de la orden actual, devolviéndola al estado inicial
     clearCurrentOrder: (state) => {
       state.currentOrder = initialState.currentOrder;
     },
-
-    // Agrega la orden actual al array de órdenes activas y luego limpia la orden actual
-    addCurrentOrderToActiveOrders: (state, action) => {
+    addCurrentOrderToHistoricOrders: (state, action) => {
       const { order, items } = action.payload;
-
-      state.activeOrders.push({
+      state.historicOrders.push({
         ...order,
-        items: items || [], // Asegúrate de que los items estén presentes
-        state: 'pending', // Estado inicial de la orden
+        items: items || [],
+        status: 'pendiente',
       });
-
       state.currentOrder = initialState.currentOrder;
     },
 
-    // Elimina una orden activa específica por su código
-    removeActiveOrder: (state, action) => {
-      state.activeOrders = state.activeOrders.filter(
-        (order) => order.code !== action.payload
-      );
+    // NUEVA FUNCIÓN
+    addCurrentOrderToActiveOrders: (state, action) => {
+      const { order, items } = action.payload;
+      // Puedes ajustar el status si lo deseas, por ejemplo 'pending' u otro.
+      state.activeOrders.push({
+        ...order,
+        items: items || [],
+        status: 'pendiente',
+      });
+      state.currentOrder = initialState.currentOrder;
     },
 
-    // Establece una lista completa de órdenes históricas
+    removeHistoricOrder: (state, action) => {
+      state.historicOrders = state.historicOrders.filter(
+        (o) => o.id !== action.payload
+      );
+    },
     setHistoricOrders: (state, action) => {
       state.historicOrders = action.payload;
     },
-
-    // Agrega una orden al historial
     addHistoricOrder: (state, action) => {
       state.historicOrders.push(action.payload);
     },
-
-    // Actualiza el estado de una orden activa (y también el de la orden actual, si corresponde)
     updateOrderState: (state, action) => {
-      const { code, newState } = action.payload;
-
-      // Busca y actualiza la orden activa
-      const order = state.activeOrders.find((o) => o.code === code);
+      const { orderId, newStatus } = action.payload;
+      console.log(`in action updatestate id :${orderId}, status: ${newStatus}`);
+      const order = state.historicOrders.find((o) => o.id === orderId);
       if (order) {
-        order.state = newState;
+        order.status = newStatus;
       }
-
-      // Si la orden actual coincide con la que se está actualizando, también actualiza su estado
-      if (state.currentOrder?.code === code) {
-        state.currentOrder.state = newState;
+      if (state.currentOrder.id === orderId) {
+        state.currentOrder.status = newStatus;
+      }
+    },
+    setCurrentOrderById: (state, action) => {
+      const orderId = action.payload;
+      const order = state.historicOrders.find((o) => o.id === orderId);
+      if (order) {
+        state.currentOrder = { ...order };
       }
     },
   },
 });
 
-// Exportar acciones y reducer
 export const {
   setCurrentOrder,
   setOrderItems,
   clearCurrentOrder,
-  addCurrentOrderToActiveOrders,
-  removeActiveOrder,
+  addCurrentOrderToHistoricOrders,
+  removeHistoricOrder,
   setHistoricOrders,
   addHistoricOrder,
   updateOrderState,
+  setCurrentOrderById,
+
+  // Asegúrate de exportar la nueva acción
+  addCurrentOrderToActiveOrders,
 } = orderSlice.actions;
 
 export default orderSlice.reducer;

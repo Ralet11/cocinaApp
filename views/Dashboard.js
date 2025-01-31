@@ -34,8 +34,6 @@ const Dashboard = () => {
   const [groupedProducts, setGroupedProducts] = useState({});
   const [partner, setPartner] = useState(null);
 
-  console.log(groupedProducts, "gro")
-
   // Control de carga general de la pantalla (partner, productos, etc.)
   const [isScreenLoading, setIsScreenLoading] = useState(true);
   // Control de carga específico para "addresses"
@@ -46,7 +44,7 @@ const Dashboard = () => {
   const historicOrders = useSelector((state) => state.order.historicOrders);
   const token = useSelector((state) => state.user?.userInfo?.token);
   const user_id = useSelector((state) => state.user?.userInfo?.id);
-
+  console.log(historicOrders, "order11s")
   // -- Redux: direcciones --
   const addresses = useSelector((state) => state.user?.addresses);
   const currentAddress = useSelector((state) => state.user?.currentAddress);

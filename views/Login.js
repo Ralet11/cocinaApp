@@ -16,15 +16,13 @@ import { setUser } from '../redux/slices/user.slice';
 import Toast from 'react-native-toast-message';
 import { API_URL } from '@env';
 
-
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('ramiro@gmail.com');
   const [password, setPassword] = useState('123456');
-
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
-  const dispatch = useDispatch();
 
+  const dispatch = useDispatch();
 
   const isValidEmail = (value) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,11 +30,9 @@ const Login = ({ navigation }) => {
   };
 
   const handleSignIn = async () => {
-    
     setEmailError(false);
     setPasswordError(false);
 
-  
     if (!email || !isValidEmail(email)) {
       setEmailError(true);
       Toast.show({
@@ -52,24 +48,20 @@ const Login = ({ navigation }) => {
       Toast.show({
         type: 'error',
         text1: 'Invalid Password',
-        text2: 'check your password and try again.',
+        text2: 'Check your password and try again.',
       });
       return;
     }
 
-  
     const data = { email, password };
 
     try {
-  
       const response = await axios.post(`${API_URL}/user/login`, data);
 
       if (response.status === 200) {
         const { user, token } = response.data;
 
         dispatch(setUser({ ...user, token }));
-
-       
         navigation.navigate('HomeTabs');
       } else {
         Toast.show({
@@ -79,7 +71,7 @@ const Login = ({ navigation }) => {
         });
       }
     } catch (error) {
-      console.error('Error al iniciar sesión:', error);
+      console.error('Error during login:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -94,7 +86,6 @@ const Login = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-     
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <Icon name="rocket" size={40} color="#4C1D95" />
@@ -103,14 +94,12 @@ const Login = ({ navigation }) => {
           <Text style={styles.subtitle}>Log in to your account to continue</Text>
         </View>
 
-       
-        <View> </View>
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <TextInput
               style={[
                 styles.input,
-                emailError && styles.inputError, 
+                emailError && styles.inputError,
               ]}
               placeholder="john@email.com"
               placeholderTextColor="#9CA3AF"
@@ -125,7 +114,7 @@ const Login = ({ navigation }) => {
             <TextInput
               style={[
                 styles.input,
-                passwordError && styles.inputError, 
+                passwordError && styles.inputError,
               ]}
               placeholder="Password"
               placeholderTextColor="#9CA3AF"
@@ -139,12 +128,10 @@ const Login = ({ navigation }) => {
             <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
           </TouchableOpacity>
 
-      
           <TouchableOpacity style={styles.button} onPress={handleSignIn}>
             <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
 
-       
           <TouchableOpacity
             style={styles.signupLink}
             onPress={() => navigation.navigate('Signup')}
@@ -156,7 +143,6 @@ const Login = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-   
       <Toast />
     </SafeAreaView>
   );
@@ -218,7 +204,7 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
   },
   inputError: {
-    borderColor: '#EF4444', // Borde rojo sutil
+    borderColor: '#EF4444',
   },
   forgotPassword: {
     alignSelf: 'flex-end',

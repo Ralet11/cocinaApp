@@ -8,6 +8,7 @@ import AppNavigation from './navigation';
 import { store, persistor } from './redux/store'; // Ajusta la ruta si es necesario
 import toastConfig from './components/toastConfig';
 import 'react-native-get-random-values';
+import socket from './config/socket';
 
 export default function App() {
   return (

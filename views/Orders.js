@@ -15,99 +15,187 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 
-const Orders = () => {
+/* Helper: Devuelve el estilo de tarjeta en base al estado. */
+function getCardStyleByStatus(status) {
+  const lowerStatus = status?.toLowerCase();
+  switch (lowerStatus) {
+    case 'pendiente':
+      return { backgroundColor: '#FEF9C3' }; // Amarillo muy claro
+    case 'aceptada':
+      return { backgroundColor: '#DCFCE7' }; // Verde claro
+    case 'envio':
+      return { backgroundColor: '#E0F2FE' }; // Azul claro
+    case 'finalizada':
+      return { backgroundColor: '#F3F4F6' }; // Gris claro
+    case 'rechazada':
+    case 'cancelada':
+      return { backgroundColor: '#FEE2E2' }; // Rojo claro
+    default:
+      return { backgroundColor: '#FFFFFF' };
+  }
+}
+
+export default function Orders() {
   const navigation = useNavigation();
+
+  // Estados para búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  // Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Tomamos las órdenes del store
   const historicOrders = useSelector((state) => state.order.historicOrders);
 
-  // Filtramos por código o dirección de entrega
-  const filteredOrders = historicOrders.filter((order) => {
-    const codeMatch = order.code
-      ?.toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const addressMatch = order.deliveryAddress
-      ?.toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    return codeMatch || addressMatch;
-  });
+  // Filtro y búsqueda
+  function applyFilters() {
+    let orders = [...historicOrders];
 
-  // Separamos las órdenes en finalizadas y no finalizadas
+    // Filtrar por estado
+    if (filterStatus === 'active') {
+      orders = orders.filter(
+        (o) => !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
+      );
+    } else if (filterStatus === 'finished') {
+      orders = orders.filter(
+        (o) => ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
+      );
+    }
+
+    // Búsqueda por code o dirección
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      orders = orders.filter((order) => {
+        const codeMatch = order.code?.toLowerCase().includes(query);
+        const addressMatch = order.deliveryAddress?.toLowerCase().includes(query);
+        return codeMatch || addressMatch;
+      });
+    }
+
+    return orders;
+  }
+
+  const filteredOrders = applyFilters();
+
+  // Separar en activas e históricas (para mostrar en la vista "all")
   const activeOrders = filteredOrders.filter(
-    (order) => order.status !== 'finalizada',
+    (o) => !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
   );
-  const finishedOrders = filteredOrders.filter(
-    (order) => order.status === 'finalizada',
+  const finishedOrders = filteredOrders.filter((o) =>
+    ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
   );
 
-  // Unimos primero las activas y después las finalizadas
-  const sortedOrders = [...activeOrders, ...finishedOrders];
-
-  // Función para formatear fecha
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  };
-
-  // Función para abrir el modal (solo para órdenes finalizadas)
+  // Funciones para Modal
   const openModal = (order) => {
     setSelectedOrder(order);
     setModalVisible(true);
   };
-
-  // Función para cerrar el modal
   const closeModal = () => {
-    setModalVisible(false);
     setSelectedOrder(null);
+    setModalVisible(false);
   };
 
-  // Función para manejar el onPress según el estado de la orden
+  // Navegación al detalle de orden o abrir modal si está finalizada
   const handlePress = (order) => {
-    if (order.status === 'finalizada') {
-      // Órdenes finalizadas -> mostrar modal
+    const lowerStatus = order.status?.toLowerCase();
+    if (['finalizada', 'rechazada', 'cancelada'].includes(lowerStatus)) {
       openModal(order);
     } else {
-      // Órdenes activas -> navegar a OrderTracking
       navigation.navigate('OrderTracking', { orderId: order.id });
     }
   };
 
+  // Formato de fecha muy simple
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Orders</Text>
-        <TouchableOpacity style={styles.filterButton}>
+        <View style={styles.filterButton}>
           <Icon name="tune-vertical" size={24} color="#4C1D95" />
-        </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Search Bar */}
+      {/* SEARCH BAR */}
       <View style={styles.searchContainer}>
         <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search orders"
+          placeholder="Search orders..."
           placeholderTextColor="#9CA3AF"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
       </View>
 
-      {/* Orders List */}
+      {/* FILTRO DE ESTATUS */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[
+            styles.filterOption,
+            filterStatus === 'all' && styles.filterOptionActive,
+          ]}
+          onPress={() => setFilterStatus('all')}
+        >
+          <Text
+            style={[
+              styles.filterOptionText,
+              filterStatus === 'all' && styles.filterOptionTextActive,
+            ]}
+          >
+            All
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterOption,
+            filterStatus === 'active' && styles.filterOptionActive,
+          ]}
+          onPress={() => setFilterStatus('active')}
+        >
+          <Text
+            style={[
+              styles.filterOptionText,
+              filterStatus === 'active' && styles.filterOptionTextActive,
+            ]}
+          >
+            Active
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterOption,
+            filterStatus === 'finished' && styles.filterOptionActive,
+          ]}
+          onPress={() => setFilterStatus('finished')}
+        >
+          <Text
+            style={[
+              styles.filterOptionText,
+              filterStatus === 'finished' && styles.filterOptionTextActive,
+            ]}
+          >
+            Finished
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* LISTADO DE ÓRDENES */}
       <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-        {sortedOrders.map((order) => {
-          const isActive = order.status !== 'finalizada';
-          return (
+        {filterStatus !== 'all' && (
+          // Si NO estamos en "all", se muestran solo las órdenes resultantes del filtro actual
+          filteredOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
-              style={[
-                styles.orderItem,
-                isActive && styles.activeOrderItem, // Estilo adicional para órdenes activas
-              ]}
+              style={[styles.orderItem, getCardStyleByStatus(order.status)]}
               onPress={() => handlePress(order)}
             >
               <Image
@@ -115,22 +203,81 @@ const Orders = () => {
                 style={styles.orderImage}
               />
               <View style={styles.orderInfo}>
-                <Text style={styles.orderTitle}>{order.code || 'Sin código'}</Text>
+                <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
                 <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
-                <Text style={styles.orderStatus}>
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                </Text>
+                <Text style={styles.orderStatus}>{order.status}</Text>
                 <View style={styles.orderFooter}>
                   <Text style={styles.orderTotal}>${order.finalPrice}</Text>
                 </View>
               </View>
               <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
             </TouchableOpacity>
-          );
-        })}
+          ))
+        )}
+
+        {filterStatus === 'all' && (
+          <>
+            {/* ÓRDENES ACTIVAS */}
+            {activeOrders.length > 0 && (
+              <Text style={styles.sectionTitle}>Active Orders</Text>
+            )}
+            {activeOrders.map((order) => (
+              <TouchableOpacity
+                key={order.id}
+                style={[styles.orderItem, getCardStyleByStatus(order.status)]}
+                onPress={() => handlePress(order)}
+              >
+                <Image
+                  source={{ uri: '/placeholder.svg?height=80&width=80' }}
+                  style={styles.orderImage}
+                />
+                <View style={styles.orderInfo}>
+                  <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
+                  <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
+                  <Text style={styles.orderStatus}>{order.status}</Text>
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.orderTotal}>${order.finalPrice}</Text>
+                  </View>
+                </View>
+                <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+              </TouchableOpacity>
+            ))}
+
+            {/* SEPARADOR */}
+            {activeOrders.length > 0 && finishedOrders.length > 0 && (
+              <View style={styles.separator} />
+            )}
+
+            {/* ÓRDENES HISTÓRICAS */}
+            {finishedOrders.length > 0 && (
+              <Text style={styles.sectionTitle}>Historical Orders</Text>
+            )}
+            {finishedOrders.map((order) => (
+              <TouchableOpacity
+                key={order.id}
+                style={[styles.orderItem, getCardStyleByStatus(order.status)]}
+                onPress={() => handlePress(order)}
+              >
+                <Image
+                  source={{ uri: '/placeholder.svg?height=80&width=80' }}
+                  style={styles.orderImage}
+                />
+                <View style={styles.orderInfo}>
+                  <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
+                  <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
+                  <Text style={styles.orderStatus}>{order.status}</Text>
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.orderTotal}>${order.finalPrice}</Text>
+                  </View>
+                </View>
+                <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
       </ScrollView>
 
-      {/* Modal para mostrar detalles de la orden finalizada */}
+      {/* MODAL DE DETALLES (para pedidos finalizados) */}
       {selectedOrder && (
         <Modal
           visible={modalVisible}
@@ -185,13 +332,16 @@ const Orders = () => {
       )}
     </SafeAreaView>
   );
-};
+}
 
+/* Estilos */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+
+  /* HEADER */
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -212,11 +362,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  /* SEARCH BAR */
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   searchIcon: {
     position: 'absolute',
@@ -225,7 +377,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 50,
+    height: 48,
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingLeft: 48,
@@ -233,35 +385,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4B5563',
   },
+
+  /* FILTROS */
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  filterOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 4,
+  },
+  filterOptionActive: {
+    backgroundColor: '#4C1D95',
+  },
+  filterOptionText: {
+    fontSize: 14,
+    color: '#4C1D95',
+    fontWeight: '500',
+  },
+  filterOptionTextActive: {
+    color: '#FFFFFF',
+  },
+
+  /* LISTA DE ÓRDENES */
   ordersList: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginTop: 8,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4C1D95',
+    marginVertical: 8,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 8,
+  },
+
+  /* ITEM DE ORDEN */
   orderItem: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 12,
     marginBottom: 16,
     padding: 16,
+    // Sombra
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 3,
   },
-  // Estilo adicional para las órdenes activas
-  activeOrderItem: {
-    borderWidth: 1,
-    borderColor: '#10B981', // un verde suave, por ejemplo
-    backgroundColor: '#ECFDF5', // un fondo suave para destacar
-  },
   orderImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 70,
+    height: 70,
+    borderRadius: 10,
     marginRight: 16,
   },
   orderInfo: {
@@ -271,18 +454,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#4B5563',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   orderAddress: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   orderStatus: {
     fontSize: 14,
     color: '#4C1D95',
     fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   orderFooter: {
     flexDirection: 'row',
@@ -301,6 +484,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
   },
+
+  /* MODAL DE DETALLES */
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -370,5 +555,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-export default Orders;

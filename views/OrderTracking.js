@@ -7,58 +7,36 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  BackHandler,
   Image,
+  Dimensions,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'react-native-axios';
-import socket from '../config/socket'; // Importa el socket configurado
-import { updateOrderState } from '../redux/slices/order.slice'; // Acción de Redux
-import socketIOClient from "socket.io-client";
-import { OrderStatusTracker } from '../components/OrderTracker'; // Componente de tracking
+import { OrderStatusTracker } from '../components/OrderTracker';
 import { API_URL } from '@env';
+
+const { width } = Dimensions.get('window');
 
 export default function OrderTrackingScreen() {
   const route = useRoute();
   const navigation = useNavigation();
-  const dispatch = useDispatch();
   const { orderId } = route.params;
-
-
-  const orders = useSelector((state) => state.order.activeOrders);
-  const order = orders.find((o) => o.id === orderId);
-
+  const allOrders = useSelector((state) => [
+    ...state.order.activeOrders,
+    ...state.order.historicOrders,
+  ]);
+  
+  const currentOrder = allOrders.find((o) => o.id === orderId);
   const [orderProducts, setOrderProducts] = useState(null);
-  const [expandedItems, setExpandedItems] = useState({});
   const [loading, setLoading] = useState(false);
 
-  console.log(order, "order")
-
-  // Manejar el botón de retroceso para navegar a HomeTabs
-  useEffect(() => {
-    const backAction = () => {
-      navigation.navigate('HomeTabs');
-      return true;
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
-
-    return () => backHandler.remove();
-  }, [navigation]);
-
-  // Cargar los productos de la orden al montar el componente
   useEffect(() => {
     const fetchOrderProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(
-          `${API_URL}/order-products/getByOrder/${orderId}`
-        );
+        const response = await axios.get(`${API_URL}/order-products/getByOrder/${orderId}`);
         setOrderProducts(response.data);
       } catch (error) {
         console.log('Error fetching order products:', error);
@@ -66,144 +44,47 @@ export default function OrderTrackingScreen() {
         setLoading(false);
       }
     };
-
     fetchOrderProducts();
   }, [orderId]);
 
-  // Escuchar cambios en el estado de la orden mediante WebSocket
-  useEffect(() => {
-    const socket = socketIOClient("http://192.168.0.251:3000", {
-      transports: ["websocket"],
-    });
-  
-    // Confirmar conexión
-    socket.on("connect", () => {
-      console.log("Conectado al socket con ID:", socket.id);
-    });
-  
-    // Escuchar el evento personalizado
-    socket.on("state changed", (data) => {
-      console.log("Evento 'state changed' recibido:", data);
-      // Puedes usar `data` para actualizar Redux o el estado local
-    });
-  
-    // Manejar errores
-    socket.on("connect_error", (err) => {
-      console.error("Error al conectar al socket:", err);
-    });
-  
-    // Limpieza al desmontar el componente
-    return () => {
-      socket.disconnect();
-      console.log("Socket desconectado.");
-    };
-  }, []);
-
-  // Expandir o contraer los detalles de un producto
-  const toggleItemExpansion = (itemId) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
-  };
-
-  // Renderizar los ingredientes (incluidos o extras)
-  const renderIngredients = (title, ingredients = []) => {
-    if (!ingredients.length) return null;
-    return (
-      <View style={styles.ingredientsContainer}>
-        <Text style={styles.ingredientsTitle}>{title}</Text>
-        {ingredients.map((ingredient, index) => (
-          <View key={index} style={styles.ingredientRow}>
-            <Icon name="circle-small" size={16} color="#6B7280" />
-            <Text style={styles.ingredientName}>{ingredient.name}</Text>
-            {ingredient.price && (
-              <Text style={styles.ingredientPrice}>
-                +${parseFloat(ingredient.price).toFixed(2)}
-              </Text>
-            )}
-          </View>
-        ))}
-      </View>
-    );
-  };
-
-  // Renderizar los productos de la orden
   const renderOrderItems = () => {
     if (!orderProducts || !orderProducts.length) {
       return (
-        <Text style={styles.infoText}>
-          No products found for this order.
-        </Text>
+        <Text style={styles.infoText}>No products found for this order.</Text>
       );
     }
-
-    return orderProducts.map((orderItem) => {
-      const isExpanded = expandedItems[orderItem.id] || false;
-      return (
-        <View key={orderItem.id} style={styles.itemContainer}>
-          <TouchableOpacity
-            style={styles.itemHeader}
-            onPress={() => toggleItemExpansion(orderItem.id)}
-          >
-            <View style={styles.itemLeft}>
-              <Image
-                source={{
-                  uri: orderItem.product?.imageUrl || 'https://via.placeholder.com/50',
-                }}
-                style={styles.itemImage}
-              />
-              <View>
-                <Text style={styles.itemName}>
-                  {orderItem.quantity}x {orderItem.product?.name}
-                </Text>
-                <Text style={styles.itemPrice}>
-                  ${parseFloat(orderItem.price).toFixed(2)}
-                </Text>
-              </View>
-            </View>
-            <Icon
-              name={isExpanded ? 'chevron-up' : 'chevron-down'}
-              size={24}
-              color="#6B7280"
-            />
-          </TouchableOpacity>
-
-          {isExpanded && (
-            <View style={styles.expandedContent}>
-              {renderIngredients(
-                'Included:',
-                orderItem.extras?.includedIngredients
-              )}
-              {renderIngredients(
-                'Extras:',
-                orderItem.extras?.extraIngredients
-              )}
-            </View>
-          )}
+    return orderProducts.map((orderItem) => (
+      <View key={orderItem.id} style={styles.itemContainer}>
+        <Image
+          source={{
+            uri: orderItem.product?.imageUrl || 'https://via.placeholder.com/50',
+          }}
+          style={styles.itemImage}
+        />
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemName}>
+            {orderItem.quantity}x {orderItem.product?.name}
+          </Text>
+          <Text style={styles.itemPrice}>
+            ${parseFloat(orderItem.price).toFixed(2)}
+          </Text>
         </View>
-      );
-    });
+      </View>
+    ));
   };
 
-  if (!order) {
+  if (!currentOrder) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>
-          Order not found or no longer active.
-        </Text>
+        <Text style={styles.errorText}>Order not found or no longer active.</Text>
       </SafeAreaView>
     );
   }
 
-  if (loading && !orderProducts) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator
-          size="large"
-          color="#4F46E5"
-          style={{ marginTop: 20 }}
-        />
+        <ActivityIndicator size="large" color="#2563EB" style={styles.loader} />
       </SafeAreaView>
     );
   }
@@ -216,31 +97,36 @@ export default function OrderTrackingScreen() {
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Tracking</Text>
-        <View style={{ width: 24, height: 24 }} />
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Contenido */}
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Tracker de estatus */}
-        <OrderStatusTracker currentStatus={order.state || 'Pending'} />
+      {/* Contenido principal */}
+      <ScrollView
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Tarjeta con el estado actual */}
+        <View style={styles.cardContainer}>
+          <OrderStatusTracker currentStatus={currentOrder.status || 'pendiente'} />
+        </View>
 
         {/* Detalles de la orden */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Order Details</Text>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Order ID:</Text>
-            <Text style={styles.detailValue}>{order.id}</Text>
+            <Text style={styles.detailValue}>#{currentOrder.id}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total:</Text>
             <Text style={styles.detailValue}>
-              ${parseFloat(order.finalPrice || 0).toFixed(2)}
+              ${parseFloat(currentOrder.finalPrice || 0).toFixed(2)}
             </Text>
           </View>
-          <View style={styles.detailRow}>
+          <View style={[styles.detailRow, styles.lastDetailRow]}>
             <Text style={styles.detailLabel}>Delivery Address:</Text>
-            <Text style={styles.detailValue}>
-              {order.deliveryAddress || 'No address provided'}
+            <Text style={styles.detailValue} numberOfLines={2}>
+              {currentOrder.deliveryAddress || 'No address provided'}
             </Text>
           </View>
         </View>
@@ -251,135 +137,156 @@ export default function OrderTrackingScreen() {
           {renderOrderItems()}
         </View>
       </ScrollView>
+
+      {/* Footer con botón */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.footerButton}
+          onPress={() => navigation.navigate('HomeTabs')}
+        >
+          <Text style={styles.footerButtonText}>Back to Home</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  /* Pantalla principal */
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
   },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 80,
+  },
+
+  /* Loader y mensaje de error */
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    marginTop: 40,
+    textAlign: 'center',
+    color: '#EF4444',
+    fontSize: 16,
+  },
+
+  /* Encabezado */
   header: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
-  contentContainer: {
-    padding: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-    marginTop: 20,
+
+  /* Tarjetas */
+  cardContainer: {
+    marginTop: 16,
+    marginBottom: 12,
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    // sombra sutil
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 6,
   },
+
+  /* Filas de detalle */
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  lastDetailRow: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
   },
   detailLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
+    flex: 1.2,
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#111827',
     fontWeight: '500',
-    maxWidth: '60%',
+    flex: 1,
+    textAlign: 'right',
   },
-  infoText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
+
+  /* Lista de productos */
   itemContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-  },
-  itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomColor: '#F3F4F6',
+    borderBottomWidth: 1,
   },
   itemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    marginRight: 10,
+  },
+  itemDetails: {
+    flex: 1,
   },
   itemName: {
-    fontSize: 16,
-    color: '#374151',
-    fontWeight: '600',
-    maxWidth: 200,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 3,
   },
   itemPrice: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
-    marginTop: 4,
   },
-  expandedContent: {
-    padding: 12,
+
+  /* Footer */
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  ingredientsContainer: {
-    marginBottom: 8,
-  },
-  ingredientsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#4B5563',
-  },
-  ingredientRow: {
-    flexDirection: 'row',
+  footerButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 12,
     alignItems: 'center',
-    marginLeft: 8,
-    marginBottom: 2,
   },
-  ingredientName: {
-    fontSize: 14,
-    color: '#4B5563',
-    flex: 1,
-    marginLeft: 4,
-  },
-  ingredientPrice: {
-    fontSize: 14,
-    color: '#6B7280',
+  footerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

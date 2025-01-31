@@ -28,6 +28,8 @@ export default function OrderSummaryScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedItems, setExpandedItems] = useState({});
 
+  console.log(currentOrder, "order")
+
   const { items = [], price = 0, deliveryFee = 0 } = currentOrder;
   const taxes = 0.54;
   const total = price + deliveryFee + taxes;
@@ -85,7 +87,7 @@ export default function OrderSummaryScreen({ navigation }) {
         dispatch(addCurrentOrderToActiveOrders({ order, items }));
         dispatch(clearCurrentOrder());
         dispatch(clearCart())
-
+        console.log(typeof order.id);
         navigation.navigate('OrderTracking', { orderId: order.id });
       }
     } catch (error) {

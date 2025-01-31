@@ -18,6 +18,9 @@ import AddressesView from './views/Addresses';
 import SelectNewAddress from './views/SelectNewAddress';
 import FirstAddressScreen from './views/FirstAddressScreen';
 import OrderTrackingScreen from './views/OrderTracking';
+import Coupons from './views/Coupons';
+import Terms from './views/TermsAndConditions';
+import PersonalInfo from './views/PersonalInfo';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -96,14 +99,18 @@ export default function AppNavigation() {
         <Stack.Screen name="Profile" component={ProfileView} />
         <Stack.Screen name="Addresses" component={AddressesView} />
         <Stack.Screen name="SelectNewAddress" component={SelectNewAddress} />
-        <Stack.Screen 
-          name="FirstAddressScreen" 
-          component={FirstAddressScreen} 
-         
+        <Stack.Screen
+          name="FirstAddressScreen"
+          component={FirstAddressScreen}
+
         />
-             <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+        <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+
+        <Stack.Screen name="PersonalInfo" component={PersonalInfo} />
+        <Stack.Screen name="Coupons" component={Coupons} />
+        <Stack.Screen name="Terms" component={Terms} />
       </Stack.Navigator>
- 
+
     </NavigationContainer>
   );
 }
