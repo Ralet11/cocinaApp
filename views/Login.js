@@ -17,10 +17,14 @@ import Toast from 'react-native-toast-message';
 import { API_URL } from '@env';
 
 const Login = ({ navigation }) => {
-  const [email, setEmail] = useState('ramiro@gmail.com');
-  const [password, setPassword] = useState('123456');
+  // Estado para el login
+  const [email, setEmail] = useState('ramiro.alet@hotmail.com');
+  const [password, setPassword] = useState('123123');
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
+
+  // Estado que controla si estamos en modo "Forgot Password"
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const dispatch = useDispatch();
 
@@ -60,7 +64,6 @@ const Login = ({ navigation }) => {
 
       if (response.status === 200) {
         const { user, token } = response.data;
-
         dispatch(setUser({ ...user, token }));
         navigation.navigate('HomeTabs');
       } else {
@@ -80,6 +83,38 @@ const Login = ({ navigation }) => {
     }
   };
 
+  const handleForgotPasswordRequest = async () => {
+    // Validamos el email antes de enviar
+    if (!email || !isValidEmail(email)) {
+      setEmailError(true);
+      Toast.show({
+        type: 'error',
+        text1: 'Email inválido',
+        text2: 'Por favor ingresa un email válido.',
+      });
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/user/forgot-password`, { email });
+      if (response.status === 200) {
+        // Si todo salió bien, mostramos feedback
+        Toast.show({
+          type: 'success',
+          text1: 'Recuperación de contraseña',
+          text2: response.data.message || 'Correo de recuperación enviado.',
+        });
+      }
+    } catch (error) {
+      console.error('Error during password reset request:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'No se pudo enviar el correo.',
+      });
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -90,58 +125,105 @@ const Login = ({ navigation }) => {
           <View style={styles.iconContainer}>
             <Icon name="rocket" size={40} color="#4C1D95" />
           </View>
-          <Text style={styles.title}>Hello again!</Text>
-          <Text style={styles.subtitle}>Log in to your account to continue</Text>
+          <Text style={styles.title}>¡Hola de nuevo!</Text>
+          <Text style={styles.subtitle}>
+            {showForgotPassword
+              ? 'Recupera tu contraseña'
+              : 'Inicia sesión en tu cuenta para continuar'}
+          </Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                emailError && styles.inputError,
-              ]}
-              placeholder="john@email.com"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+        {/* Si NO estamos en modo 'Forgot Password', muestra el formulario de login */}
+        {!showForgotPassword && (
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  emailError && styles.inputError,
+                ]}
+                placeholder="Correo electrónico"
+                placeholderTextColor="#9CA3AF"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  passwordError && styles.inputError,
+                ]}
+                placeholder="Contraseña"
+                placeholderTextColor="#9CA3AF"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={() => setShowForgotPassword(true)}
+            >
+              <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.button} onPress={handleSignIn}>
+              <Text style={styles.buttonText}>Iniciar Sesión</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.signupLink}
+              onPress={() => navigation.navigate('Signup')}
+            >
+              <Text style={styles.signupText}>
+                ¿No tienes cuenta?{' '}
+                <Text style={styles.signupTextBold}>Regístrate</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
+        )}
 
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[
-                styles.input,
-                passwordError && styles.inputError,
-              ]}
-              placeholder="Password"
-              placeholderTextColor="#9CA3AF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
-
-          <TouchableOpacity style={styles.forgotPassword}>
-            <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-            <Text style={styles.buttonText}>Sign In</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.signupLink}
-            onPress={() => navigation.navigate('Signup')}
-          >
-            <Text style={styles.signupText}>
-              Don't have an account?{' '}
-              <Text style={styles.signupTextBold}>Sign up</Text>
+        {/* Si SÍ estamos en modo 'Forgot Password', muestra el formulario para recuperar contraseña */}
+        {showForgotPassword && (
+          <View style={styles.form}>
+            <Text style={styles.resetInfo}>
+              Ingresa tu correo electrónico para enviarte un enlace de recuperación.
             </Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  emailError && styles.inputError,
+                ]}
+                placeholder="Correo electrónico"
+                placeholderTextColor="#9CA3AF"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, { marginBottom: 10 }]}
+              onPress={handleForgotPasswordRequest}
+            >
+              <Text style={styles.buttonText}>Enviar enlace de recuperación</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.backToLogin}
+              onPress={() => setShowForgotPassword(false)}
+            >
+              <Text style={styles.backToLoginText}>Volver al Login</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
       <Toast />
     </SafeAreaView>
@@ -242,6 +324,20 @@ const styles = StyleSheet.create({
   signupTextBold: {
     color: '#4C1D95',
     fontWeight: 'bold',
+  },
+  resetInfo: {
+    color: '#4B5563',
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  backToLogin: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  backToLoginText: {
+    color: '#4C1D95',
+    fontSize: 14,
   },
 });
 

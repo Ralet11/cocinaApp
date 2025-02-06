@@ -1,4 +1,3 @@
-// views/PersonalInfo.js
 import React from 'react';
 import {
   View,
@@ -6,7 +5,6 @@ import {
   SafeAreaView,
   StyleSheet,
   TouchableOpacity,
-  Platform,
   ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -20,27 +18,27 @@ export default function PersonalInfo({ navigation }) {
       {/* Encabezado */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#000" />
+          <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Personal Information</Text>
       </View>
 
       {/* Contenido */}
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.label}>Name</Text>
-        <Text style={styles.value}>{user?.name || 'No name'}</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.label}>Name</Text>
+          <Text style={styles.value}>{user?.name || 'No name'}</Text>
+        </View>
 
-        <View style={styles.separator} />
+        <View style={styles.infoCard}>
+          <Text style={styles.label}>Email</Text>
+          <Text style={styles.value}>{user?.email || 'No email'}</Text>
+        </View>
 
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.value}>{user?.email || 'No email'}</Text>
-
-        <View style={styles.separator} />
-
-        <Text style={styles.label}>Phone</Text>
-        <Text style={styles.value}>{user?.phone || 'No phone'}</Text>
-
-        {/* Aquí podrías agregar lógica para editar la info, por ejemplo inputs */}
+        <View style={styles.infoCard}>
+          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.value}>{user?.phone || 'No phone'}</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -54,32 +52,33 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 1,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    padding: 20,
+    backgroundColor: '#6D28D9',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   backButton: {
-    padding: 4,
+    padding: 8,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
     marginLeft: 16,
   },
   contentContainer: {
     padding: 16,
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   label: {
     fontSize: 14,
@@ -90,11 +89,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#111827',
-    marginBottom: 12,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 12,
   },
 });

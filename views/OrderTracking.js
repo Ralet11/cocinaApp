@@ -14,24 +14,31 @@ import { useSelector } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'react-native-axios';
+import { API_URL } from '@env'; // Ajusta si usas otra variable
+
 import { OrderStatusTracker } from '../components/OrderTracker';
-import { API_URL } from '@env';
 
 const { width } = Dimensions.get('window');
 
 export default function OrderTrackingScreen() {
+  // Para obtener parámetros de la ruta (por ejemplo, "orderId")
   const route = useRoute();
   const navigation = useNavigation();
   const { orderId } = route.params;
+
+  // Selecciona todas las órdenes del store (activas e históricas)
   const allOrders = useSelector((state) => [
-    ...state.order.activeOrders,
     ...state.order.historicOrders,
   ]);
-  
+
+  // Filtra la orden actual
   const currentOrder = allOrders.find((o) => o.id === orderId);
+
+  // Estado local para productos de la orden (si deseas cargarlos aparte)
   const [orderProducts, setOrderProducts] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Efecto para obtener los productos de la orden (opcional, si no están en Redux)
   useEffect(() => {
     const fetchOrderProducts = async () => {
       try {
@@ -44,15 +51,18 @@ export default function OrderTrackingScreen() {
         setLoading(false);
       }
     };
-    fetchOrderProducts();
+
+    if (orderId) {
+      fetchOrderProducts();
+    }
   }, [orderId]);
 
+  // Función para renderizar la lista de productos
   const renderOrderItems = () => {
     if (!orderProducts || !orderProducts.length) {
-      return (
-        <Text style={styles.infoText}>No products found for this order.</Text>
-      );
+      return <Text style={styles.infoText}>No products found for this order.</Text>;
     }
+
     return orderProducts.map((orderItem) => (
       <View key={orderItem.id} style={styles.itemContainer}>
         <Image
@@ -73,6 +83,7 @@ export default function OrderTrackingScreen() {
     ));
   };
 
+  // Si la orden no existe en el store (puede que haya expirado o no sea válida)
   if (!currentOrder) {
     return (
       <SafeAreaView style={styles.container}>
@@ -81,6 +92,7 @@ export default function OrderTrackingScreen() {
     );
   }
 
+  // Mostrar indicador de carga mientras se obtienen los productos
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -91,7 +103,7 @@ export default function OrderTrackingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Encabezado */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.navigate('HomeTabs')}>
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
@@ -105,7 +117,7 @@ export default function OrderTrackingScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tarjeta con el estado actual */}
+        {/* Tarjeta con el estado actual de la orden */}
         <View style={styles.cardContainer}>
           <OrderStatusTracker currentStatus={currentOrder.status || 'pendiente'} />
         </View>
@@ -138,7 +150,7 @@ export default function OrderTrackingScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer con botón */}
+      {/* Footer con botón para volver al Home */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerButton}
@@ -152,7 +164,7 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* Pantalla principal */
+  // Contenedor principal
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
@@ -162,7 +174,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
 
-  /* Loader y mensaje de error */
+  // Loader y mensaje de error
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -175,7 +187,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  /* Encabezado */
+  // Header
   header: {
     backgroundColor: '#2563EB',
     paddingVertical: 12,
@@ -190,7 +202,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  /* Tarjetas */
+  // Tarjetas
   cardContainer: {
     marginTop: 16,
     marginBottom: 12,
@@ -200,7 +212,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 14,
     marginBottom: 12,
-    // sombra sutil
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
@@ -214,7 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  /* Filas de detalle */
+  // Filas de detalle
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -239,7 +250,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  /* Lista de productos */
+  // Lista de productos
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,7 +278,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 
-  /* Footer */
+  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,

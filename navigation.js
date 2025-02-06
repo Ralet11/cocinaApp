@@ -21,7 +21,7 @@ import OrderTrackingScreen from './views/OrderTracking';
 import Coupons from './views/Coupons';
 import Terms from './views/TermsAndConditions';
 import PersonalInfo from './views/PersonalInfo';
-
+import useSocket from './config/socket';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -80,6 +80,8 @@ function HomeTabs() {
 }
 
 export default function AppNavigation() {
+useSocket()
+
   return (
     <NavigationContainer theme={customTheme}>
       <Stack.Navigator

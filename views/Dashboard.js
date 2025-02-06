@@ -15,12 +15,12 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'react-native-axios';
-import socketIOClient from "socket.io-client";
+
 // Acciones de Redux
 import { setAddresses, setCurrentAddress } from "../redux/slices/user.slice";
 import { setPartnerId } from '../redux/slices/partner.slice';
 import { setHistoricOrders } from '../redux/slices/order.slice';
-
+import useSocket from '../config/socket';
 import { API_URL } from "@env";
 
 const { width } = Dimensions.get('window');

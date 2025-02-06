@@ -1,36 +1,60 @@
+// useSocket.js
+import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { API_URL } from '@env'; // Asegúrate de configurar correctamente las variables de entorno
+import { useSelector } from 'react-redux';
 import { store } from '../redux/store';
-import { updateOrderState } from '../redux/slices/order.slice'; // Importa la acción para actualizar el estado de la orden
+import { updateOrderState } from '../redux/slices/order.slice';
 
-const socket = io("http://192.168.0.251:3000", {
-  transports: ['websocket'],
-  autoConnect: true,
-});
+// O si prefieres, usa la variable de entorno: const socketUrl = API_URL;
+const SOCKET_URL = 'http://192.168.0.251:3000';
 
-// Listener cuando se conecta al servidor
-socket.on('connect', () => {
-  console.log('Socket conectado:', socket.id);
-});
+export default function useSocket() {
+  // 1. Obtenemos el userInfo (donde está el userId)
+  const userInfo = useSelector((state) => state.user.userInfo);
 
-// Listener para cambios de estado de las órdenes
-socket.on('state changed', (data) => {
-  console.log("Evento 'state changed' recibido:", data);
+  // 2. Usamos useRef para guardar la instancia del socket sin que se pierda en cada render
+  const socketRef = useRef(null);
 
-  const { orderId, status } = data;
+  useEffect(() => {
+    // Solo conectamos si existe userInfo y, por ende, userInfo.id
+    if (userInfo?.id) {
+      // 3. Inicializamos el socket
+      socketRef.current = io(SOCKET_URL, {
+        transports: ['websocket'],
+        autoConnect: true,
+      });
 
-  // Despacha la acción de Redux para actualizar el estado de la orden
-  store.dispatch(updateOrderState({ orderId, newStatus: status }));
-});
+      // 4. Escuchamos el evento `connect`
+      socketRef.current.on('connect', () => {
+        console.log('Socket conectado:', socketRef.current.id);
+        // 4.1. Emitimos el joinRoom con el userId
+        socketRef.current.emit('joinRoom', userInfo.id);
+      });
 
-// Listener para manejar errores de conexión
-socket.on('connect_error', (err) => {
-  console.error('Error al conectar al socket:', err);
-});
+      // 5. Escuchamos el evento "state changed"
+      socketRef.current.on('state changed', (data) => {
+        console.log("Evento 'state changed' recibido:", data);
+        const { orderId, status } = data;
 
-// Desconectar el socket al cerrar la aplicación (opcional)
-socket.on('disconnect', () => {
-  console.log('Socket desconectado.');
-});
+        // Despacha la acción de Redux para actualizar el estado de la orden
+        store.dispatch(updateOrderState({ orderId, newStatus: status }));
+      });
 
-export default socket;
+      // 6. Manejo de errores
+      socketRef.current.on('connect_error', (err) => {
+        console.error('Error al conectar al socket:', err);
+      });
+
+      // 7. Limpieza: al desmontar el componente o cambiar de usuario, desconectamos el socket
+      return () => {
+        console.log('Desconectando socket...');
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+        }
+      };
+    }
+  }, [userInfo?.id]); // se reejecuta si el userId cambia
+
+  // 8. Devuelve el socketRef por si necesitas usarlo en otro lado
+  return socketRef.current;
+}
