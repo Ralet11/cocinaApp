@@ -14,31 +14,30 @@ import { useSelector } from 'react-redux';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'react-native-axios';
-import { API_URL } from '@env'; // Ajusta si usas otra variable
+import { API_URL } from '@env';
 
 import { OrderStatusTracker } from '../components/OrderTracker';
 
 const { width } = Dimensions.get('window');
 
 export default function OrderTrackingScreen() {
-  // Para obtener parámetros de la ruta (por ejemplo, "orderId")
   const route = useRoute();
   const navigation = useNavigation();
   const { orderId } = route.params;
 
-  // Selecciona todas las órdenes del store (activas e históricas)
-  const allOrders = useSelector((state) => [
-    ...state.order.historicOrders,
-  ]);
+  // Unimos las órdenes activas y las históricas en una sola lista
+  const allActiveOrders = useSelector((state) => state.order.activeOrders);
+  const allHistoricOrders = useSelector((state) => state.order.historicOrders);
 
-  // Filtra la orden actual
+  // Concatenamos ambos arrays para poder buscar la orden
+  const allOrders = [...allActiveOrders, ...allHistoricOrders];
+
+  // Buscamos la orden solicitada
   const currentOrder = allOrders.find((o) => o.id === orderId);
 
-  // Estado local para productos de la orden (si deseas cargarlos aparte)
   const [orderProducts, setOrderProducts] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Efecto para obtener los productos de la orden (opcional, si no están en Redux)
   useEffect(() => {
     const fetchOrderProducts = async () => {
       try {
@@ -57,10 +56,13 @@ export default function OrderTrackingScreen() {
     }
   }, [orderId]);
 
-  // Función para renderizar la lista de productos
   const renderOrderItems = () => {
     if (!orderProducts || !orderProducts.length) {
-      return <Text style={styles.infoText}>No products found for this order.</Text>;
+      return (
+        <Text style={styles.infoText}>
+          No products found for this order.
+        </Text>
+      );
     }
 
     return orderProducts.map((orderItem) => (
@@ -83,20 +85,20 @@ export default function OrderTrackingScreen() {
     ));
   };
 
-  // Si la orden no existe en el store (puede que haya expirado o no sea válida)
   if (!currentOrder) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>Order not found or no longer active.</Text>
+        <Text style={styles.errorText}>
+          Order not found or no longer active.
+        </Text>
       </SafeAreaView>
     );
   }
 
-  // Mostrar indicador de carga mientras se obtienen los productos
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#2563EB" style={styles.loader} />
+        <ActivityIndicator size="large" color="#D32F2F" style={styles.loader} />
       </SafeAreaView>
     );
   }
@@ -164,17 +166,14 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Contenedor principal
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F5F5F5', // Igual al Dashboard
   },
   contentContainer: {
     paddingHorizontal: 16,
     paddingBottom: 80,
   },
-
-  // Loader y mensaje de error
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -183,13 +182,11 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 40,
     textAlign: 'center',
-    color: '#EF4444',
+    color: '#D32F2F',
     fontSize: 16,
   },
-
-  // Header
   header: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#D32F2F',
     paddingVertical: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -201,8 +198,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-
-  // Tarjetas
   cardContainer: {
     marginTop: 16,
     marginBottom: 12,
@@ -224,8 +219,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 6,
   },
-
-  // Filas de detalle
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -249,8 +242,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-
-  // Lista de productos
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,8 +268,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
   },
-
-  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -290,7 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#D32F2F',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',

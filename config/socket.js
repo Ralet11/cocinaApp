@@ -6,7 +6,8 @@ import { store } from '../redux/store';
 import { updateOrderState } from '../redux/slices/order.slice';
 
 // O si prefieres, usa la variable de entorno: const socketUrl = API_URL;
-const SOCKET_URL = 'http://192.168.0.251:3000';
+/* const SOCKET_URL = 'http://192.168.0.251:3000'; */
+const SOCKET_URL = 'https://54.90.29.65'
 
 export default function useSocket() {
   // 1. Obtenemos el userInfo (donde está el userId)

@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 10.2.2"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "env": {
+        "API_URL": "https://54.90.29.65/api"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -20,7 +20,6 @@ import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
-
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export default function ProductDetail({ route }) {
@@ -33,16 +32,16 @@ export default function ProductDetail({ route }) {
   const [isLoading, setIsLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
 
-  // Redux: get cart items
+  // Redux: obtener items del carrito
   const cart = useSelector((state) => state.cart.items);
 
-  // We receive `product` and `isHamburger` from route params
+  // Recibimos `product` y `isHamburger` desde los parámetros de la ruta
   const { product, isHamburger } = route.params;
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
   /**
-   * Fetch ingredients only if it's a burger.
+   * Se buscan los ingredientes solo si es una hamburguesa.
    */
   const fetchIngredients = useCallback(async () => {
     try {
@@ -67,7 +66,6 @@ export default function ProductDetail({ route }) {
   }, [product.id, isHamburger]);
 
   useEffect(() => {
-    // If it's not a burger, we have nothing to fetch
     if (!isHamburger) {
       setIsLoading(false);
       return;
@@ -75,11 +73,11 @@ export default function ProductDetail({ route }) {
     fetchIngredients();
   }, [fetchIngredients, isHamburger]);
 
-  // Separate included/extra ingredients
+  // Ingredientes incluidos y extras
   const includedIngredients = ingredients.filter((ing) => ing.included);
   const extraIngredients = ingredients.filter((ing) => !ing.included);
 
-  // Toggle included/extra
+  // Toggle de ingredientes
   const toggleIngredient = (id, isIncluded) => {
     const setterFunction = isIncluded ? setSelectedIncluded : setSelectedExtras;
     setterFunction((prev) =>
@@ -87,26 +85,22 @@ export default function ProductDetail({ route }) {
     );
   };
 
-  // Adjust quantity (min 1)
+  // Ajusta la cantidad (mínimo 1)
   const adjustQuantity = (amount) => {
     setQuantity((prev) => Math.max(1, prev + amount));
   };
 
   /**
-   * Calculates base price (and extras) for *1 unit* (not multiplied by quantity yet).
+   * Calcula el precio base (y extras) para *1 unidad* (sin multiplicar por cantidad).
    */
   const calculateBasePrice = () => {
     const productPrice = parseFloat(product.price) || 0;
-
-    // If not a burger, return the product price as-is
     if (!isHamburger) return productPrice;
 
-    // Single/Double
     const base = selectedOption === 'Single'
       ? productPrice
       : productPrice * 1.5;
 
-    // Sum of extra ingredients
     const extraPrice = selectedExtras.reduce((acc, id) => {
       const ingredient = extraIngredients.find((ing) => ing.id === id);
       return acc + (ingredient ? parseFloat(ingredient.price) || 0 : 0);
@@ -116,17 +110,17 @@ export default function ProductDetail({ route }) {
   };
 
   /**
-   * Add item to cart
+   * Agrega el producto al carrito.
    */
   const handleAddToCart = () => {
     const basePrice = calculateBasePrice();
     const totalPrice = basePrice * quantity;
-    
-    // Determinar los ingredientes eliminados como objetos completos
+
+    // Determinar los ingredientes eliminados
     const removedIngredients = isHamburger
       ? includedIngredients.filter((ing) => !selectedIncluded.includes(ing.id))
       : [];
-    
+
     // Ingredientes finales seleccionados
     const finalIncludedIngredients = isHamburger
       ? includedIngredients.filter((ing) => selectedIncluded.includes(ing.id))
@@ -134,17 +128,17 @@ export default function ProductDetail({ route }) {
     const finalExtraIngredients = isHamburger
       ? extraIngredients.filter((ing) => selectedExtras.includes(ing.id))
       : [];
-    
+
     // Crear un ID único para el carrito
     const uniqueId = [
       product.id,
       isHamburger ? selectedOption : '',
       isHamburger ? selectedIncluded.sort().join(',') : '',
       isHamburger ? selectedExtras.sort().join(',') : '',
-      removedIngredients.map((ing) => ing.id).sort().join(','), // Solo IDs para el ID único
+      removedIngredients.map((ing) => ing.id).sort().join(','),
     ].join('-');
-    
-    // Crear el objeto del carrito
+
+    // Objeto del carrito
     const cartItem = {
       id: uniqueId,
       productId: product.id,
@@ -152,17 +146,15 @@ export default function ProductDetail({ route }) {
       option: isHamburger ? selectedOption : null,
       includedIngredients: finalIncludedIngredients,
       extraIngredients: finalExtraIngredients,
-      removedIngredients: removedIngredients, // Guardar objetos completos
+      removedIngredients: removedIngredients,
       quantity,
       pricePerUnit: parseFloat(basePrice.toFixed(2)),
       totalPrice: parseFloat(totalPrice.toFixed(2)),
       image: product.img,
     };
-    
-    // Agregar al carrito en Redux
+
     dispatch(addItem(cartItem));
-    
-    // Mostrar mensaje de éxito
+
     Toast.show({
       type: 'success',
       text1: 'Product added',
@@ -171,19 +163,19 @@ export default function ProductDetail({ route }) {
       visibilityTime: 2000,
       bottomOffset: 100,
     });
-    
+
     setIsAdding(true);
     setTimeout(() => setIsAdding(false), 2000);
   };
 
-  // For the blurred header animation
+  // Animación para el header borroso
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  // Renders each ingredient button
+  // Renderiza cada botón de ingrediente
   const renderIngredientButton = (ing, isIncluded) => (
     <TouchableOpacity
       key={ing.id}
@@ -196,7 +188,6 @@ export default function ProductDetail({ route }) {
     >
       <View style={styles.ingredientInfo}>
         <Text style={styles.ingredientName}>{ing.name}</Text>
-        {/* Show price only for extra ingredients */}
         {!isIncluded && (
           <Text style={styles.ingredientMeta}>
             ${parseFloat(ing.price).toFixed(2)}
@@ -225,11 +216,10 @@ export default function ProductDetail({ route }) {
     </TouchableOpacity>
   );
 
-  // If still loading (only relevant if it's a burger)
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6D28D9" />
+        <ActivityIndicator size="large" color="#D32F2F" />
         <Text style={styles.loadingText}>Loading product details...</Text>
       </View>
     );
@@ -237,22 +227,18 @@ export default function ProductDetail({ route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with blur background */}
+      {/* Header con fondo borroso */}
       <AnimatedBlurView
         intensity={100}
         tint="light"
         style={[styles.header, { opacity: headerOpacity }]}
       >
         <Text style={styles.headerTitle}>{product.name}</Text>
-
-        {/* Cart button on the right side of the header */}
         <TouchableOpacity
           style={styles.cartButton}
-          onPress={() => {
-            navigation.navigate('CartScreen');
-          }}
+          onPress={() => navigation.navigate('CartScreen')}
         >
-          <MaterialCommunityIcons name="cart-outline" size={26} color="#1F2937" />
+          <MaterialCommunityIcons name="cart-outline" size={26} color="#000000" />
           {cart.length > 0 && (
             <View style={styles.badgeContainer}>
               <Text style={styles.badgeText}>{cart.length}</Text>
@@ -269,7 +255,7 @@ export default function ProductDetail({ route }) {
         )}
         scrollEventThrottle={16}
       >
-        {/* Back button (top-left) */}
+        {/* Botón de regresar (arriba a la izquierda) */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -278,16 +264,16 @@ export default function ProductDetail({ route }) {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Product image */}
+        {/* Imagen del producto */}
         <Image source={{ uri: product.img }} style={styles.productImage} />
 
-        {/* Product info */}
+        {/* Información del producto */}
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.name}</Text>
           <Text style={styles.description}>{product.description}</Text>
         </View>
 
-        {/* Show Single/Double options only if isHamburger */}
+        {/* Opciones Single/Double solo para hamburguesas */}
         {isHamburger && (
           <View style={styles.optionsContainer}>
             {['Single', 'Double'].map((option) => {
@@ -295,7 +281,6 @@ export default function ProductDetail({ route }) {
                 option === 'Single'
                   ? (parseFloat(product.price) || 0).toFixed(2)
                   : ((parseFloat(product.price) || 0) * 1.5).toFixed(2);
-
               return (
                 <TouchableOpacity
                   key={option}
@@ -320,7 +305,7 @@ export default function ProductDetail({ route }) {
           </View>
         )}
 
-        {/* Included ingredients */}
+        {/* Ingredientes incluidos */}
         {isHamburger && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Included Ingredients</Text>
@@ -332,7 +317,7 @@ export default function ProductDetail({ route }) {
           </View>
         )}
 
-        {/* Extra ingredients */}
+        {/* Ingredientes extra */}
         {isHamburger && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Extra Ingredients</Text>
@@ -344,11 +329,11 @@ export default function ProductDetail({ route }) {
           </View>
         )}
 
-        {/* Spacing at the bottom so content isn't hidden by the footer */}
+        {/* Espacio final para que el contenido no quede oculto por el footer */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Footer with quantity & Add button */}
+      {/* Footer con cantidad y botón de agregar */}
       <BlurView intensity={100} tint="light" style={styles.footer}>
         <View style={styles.quantityContainer}>
           <TouchableOpacity
@@ -376,11 +361,10 @@ export default function ProductDetail({ route }) {
             size={24}
             color="#FFFFFF"
           />
-          {/* Show total with 2 decimals */}
           <Text style={styles.addButtonText}>
             {isAdding
               ? 'Added!'
-              : `Add - $${(calculateBasePrice() * quantity).toFixed(2)}`}
+              : `Add $${(calculateBasePrice() * quantity).toFixed(2)}`}
           </Text>
         </TouchableOpacity>
       </BlurView>
@@ -393,18 +377,18 @@ export default function ProductDetail({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 20,
     fontSize: 16,
-    color: '#4B5563',
+    color: '#000000',
   },
   header: {
     position: 'absolute',
@@ -421,7 +405,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#000000',
   },
   cartButton: {
     position: 'absolute',
@@ -431,7 +415,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#D32F2F',
     borderRadius: 10,
     width: 20,
     height: 20,
@@ -471,11 +455,11 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#000000',
   },
   description: {
     fontSize: 16,
-    color: '#4B5563',
+    color: '#000000',
     marginTop: 8,
     lineHeight: 24,
   },
@@ -493,28 +477,28 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
+    borderColor: '#000000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   selectedOption: {
-    backgroundColor: '#F3F4F6',
-    borderColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
+    borderColor: '#D32F2F',
   },
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#000000',
   },
   selectedOptionText: {
-    color: '#6D28D9',
+    color: '#FFFFFF',
   },
   optionPrice: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#000000',
     marginTop: 4,
   },
   section: {
@@ -523,7 +507,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#000000',
     marginBottom: 16,
     marginHorizontal: 16,
   },
@@ -539,28 +523,28 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
+    borderColor: '#000000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
   selectedIngredient: {
-    backgroundColor: '#F3F4F6',
-    borderColor: '#22C55E',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D32F2F',
   },
   ingredientInfo: {
     flex: 1,
   },
   ingredientName: {
     fontSize: 16,
-    color: '#1F2937',
+    color: '#000000',
     fontWeight: '500',
   },
   ingredientMeta: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#000000',
     marginTop: 2,
   },
   checkmarkContainer: {
@@ -583,12 +567,12 @@ const styles = StyleSheet.create({
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 4,
   },
   quantityButton: {
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderRadius: 6,
     width: 32,
     height: 32,
@@ -599,9 +583,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginHorizontal: 16,
+    color: '#000000',
   },
   addButton: {
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -612,7 +597,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   addButtonSuccess: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#000000',
   },
   addButtonText: {
     color: '#FFFFFF',

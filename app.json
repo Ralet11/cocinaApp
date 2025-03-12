@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "clientApp",
-    "slug": "clientApp",
+    "name": "premier burguer",
+    "slug": "premier-burguer",
     "version": "1.0.0",
+    "scheme": "premierburguer",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -24,10 +25,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.ralet11.premierburguer"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "64dd5ca7-d521-4258-8768-58865d1c00d7"
+      }
     }
   }
 }

@@ -8,15 +8,18 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Toast from 'react-native-toast-message';
 import { useStripe } from '@stripe/stripe-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { API_URL } from '@env';
 import { addCurrentOrderToActiveOrders, clearCurrentOrder } from '../redux/slices/order.slice';
+import { clearCart } from '../redux/slices/cart.slice';
 import axios from 'react-native-axios';
-import {clearCart} from "../redux/slices/cart.slice"
+import { Linking } from 'react-native';
 
 export default function OrderSummaryScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -28,23 +31,14 @@ export default function OrderSummaryScreen({ navigation }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedItems, setExpandedItems] = useState({});
 
-  console.log(currentOrder, "order")
-
   const { items = [], price = 0, deliveryFee = 0 } = currentOrder;
   const taxes = 0.54;
   const total = price + deliveryFee + taxes;
 
-  const handleContinue = async () => {
+  // --- STRIPE Payment Flow ---
+  const handleStripePayment = async () => {
     if (!currentAddress) {
-      setIsError(true);
-      Toast.show({
-        type: 'error',
-        text1: 'You need to confirm address',
-        position: 'bottom',
-        visibilityTime: 2000,
-        bottomOffset: 80,
-      });
-      setTimeout(() => setIsError(false), 2000);
+      showAddressError();
       return;
     }
 
@@ -58,7 +52,7 @@ export default function OrderSummaryScreen({ navigation }) {
 
       const initResponse = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
-        merchantDisplayName: 'YourAppName',
+        merchantDisplayName: 'Premier Burguer',
         allowsDelayedPaymentMethods: true,
       });
 
@@ -73,29 +67,94 @@ export default function OrderSummaryScreen({ navigation }) {
       if (paymentResult.error) {
         Alert.alert('Payment failed', paymentResult.error.message);
       } else {
-        const orderData = {
-          ...currentOrder,
-          deliveryAddress: currentAddress.street,
-          finalPrice: total.toFixed(2),
-          deliveryFee: deliveryFee.toFixed(2),
-          price: price.toFixed(2),
-        };
-
-        const orderResponse = await axios.post(`${API_URL}/order/`, orderData);
-        const { message, order, orderProducts: items } = orderResponse.data;
-
-        dispatch(addCurrentOrderToActiveOrders({ order, items }));
-        dispatch(clearCurrentOrder());
-        dispatch(clearCart())
-        console.log(typeof order.id);
-        navigation.navigate('OrderTracking', { orderId: order.id });
+        await createOrderInBackend();
       }
     } catch (error) {
-      console.error('Error during order process:', error);
+      console.error('Error during Stripe order process:', error);
       Alert.alert('Error', 'Something went wrong during the payment process.');
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // --- MERCADO PAGO Flow ---
+  const handleMercadoPago = async () => {
+    if (!currentAddress) {
+      showAddressError();
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const itemsToSend = [
+        {
+          name: 'Order Total',
+          quantity: 1,
+          price: parseFloat(total.toFixed(2)),
+          currency_id: 'ARS',
+        },
+      ];
+
+      const mpResponse = await axios.post(
+        `${API_URL}/payment/mp/create-preference`,
+        itemsToSend
+      );
+      const { init_point } = mpResponse.data;
+
+      const supported = await Linking.canOpenURL(init_point);
+      if (supported) {
+        await Linking.openURL(init_point);
+      } else {
+        Alert.alert('Error', 'No se puede abrir la URL: ' + init_point);
+      }
+    } catch (error) {
+      console.error('Error during Mercado Pago process:', error);
+      Alert.alert('Error', 'Something went wrong during the Mercado Pago payment process.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Crea la orden en tu backend
+  const createOrderInBackend = async () => {
+    try {
+      const orderData = {
+        ...currentOrder,
+        deliveryAddress: currentAddress.street,
+        finalPrice: total.toFixed(2),
+        deliveryFee: deliveryFee.toFixed(2),
+        price: price.toFixed(2),
+      };
+
+      const orderResponse = await axios.post(`${API_URL}/order/`, orderData);
+      const { order, orderProducts: items } = orderResponse.data;
+
+      console.log(order, 'order');
+
+      dispatch(addCurrentOrderToActiveOrders({ order, items }));
+      dispatch(clearCurrentOrder());
+      dispatch(clearCart());
+
+      // Espera 2 segundos antes de navegar
+      setTimeout(() => {
+        navigation.navigate('OrderTracking', { orderId: order.id });
+      }, 2000);
+    } catch (err) {
+      console.error('Error creating order:', err);
+      Alert.alert('Error', 'Failed to create the order in backend');
+    }
+  };
+
+  const showAddressError = () => {
+    setIsError(true);
+    Toast.show({
+      type: 'error',
+      text1: 'You need to confirm address',
+      position: 'bottom',
+      visibilityTime: 2000,
+      bottomOffset: 80,
+    });
+    setTimeout(() => setIsError(false), 2000);
   };
 
   const toggleItemExpansion = (itemId) => {
@@ -127,6 +186,7 @@ export default function OrderSummaryScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
@@ -135,10 +195,14 @@ export default function OrderSummaryScreen({ navigation }) {
         <View style={{ width: 24, height: 24 }} />
       </View>
 
+      {/* Contenido principal */}
       <ScrollView contentContainerStyle={styles.contentContainer}>
+        {/* Dirección de entrega */}
         <View style={styles.addressSection}>
           <Text style={styles.addressLabel}>Delivery Address:</Text>
-          <Text style={styles.addressText}>{currentAddress ? currentAddress.street : ''}</Text>
+          <Text style={styles.addressText}>
+            {currentAddress ? currentAddress.street : ''}
+          </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Addresses')}>
             <Text style={styles.changeAddressText}>
               {currentAddress?.street ? 'Change address' : 'Confirm address'}
@@ -146,6 +210,7 @@ export default function OrderSummaryScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* Items */}
         {items.length > 0 && (
           <View style={styles.itemsContainer}>
             <Text style={styles.sectionTitle}>Items in your order</Text>
@@ -168,7 +233,7 @@ export default function OrderSummaryScreen({ navigation }) {
                         <Icon
                           name={isExpanded ? 'chevron-up' : 'chevron-down'}
                           size={20}
-                          color="#6B7280"
+                          color="#000000"
                         />
                       </TouchableOpacity>
                     </View>
@@ -185,33 +250,69 @@ export default function OrderSummaryScreen({ navigation }) {
           </View>
         )}
 
+        {/* Resumen de costos */}
         <View style={styles.summaryCard}>
           <Text style={styles.sectionTitle}>Summary</Text>
-          <View style={styles.summaryRow}><Text>Subtotal</Text><Text>${price.toFixed(2)}</Text></View>
-          <View style={styles.summaryRow}><Text>Fees</Text><Text>${deliveryFee.toFixed(2)}</Text></View>
-          <View style={styles.summaryRow}><Text>Taxes</Text><Text>${taxes.toFixed(2)}</Text></View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>Subtotal</Text>
+            <Text style={styles.summaryText}>${price.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>Fees</Text>
+            <Text style={styles.summaryText}>${deliveryFee.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>Taxes</Text>
+            <Text style={styles.summaryText}>${taxes.toFixed(2)}</Text>
+          </View>
           <View style={styles.divider} />
-          <View style={styles.summaryRow}><Text>Total</Text><Text>${total.toFixed(2)}</Text></View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryText, styles.totalLabel]}>Total</Text>
+            <Text style={[styles.summaryText, styles.totalAmount]}>
+              ${total.toFixed(2)}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
+      {/* Footer con botones de pago */}
       <View style={styles.footer}>
+        {/* Botón: Stripe */}
         <TouchableOpacity
-          style={styles.continueButton}
-          onPress={handleContinue}
+          style={[styles.paymentButton, { marginRight: 10 }]}
+          onPress={handleStripePayment}
           disabled={isProcessing}
         >
           {isProcessing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.continueButtonText}>Continue</Text>
+            <View style={styles.buttonContent}>
+              <Image
+                source={require('../assets/stripe-logo.jpg')}
+                style={styles.buttonLogo}
+              />
+              <Text style={styles.continueButtonText}>Pay with Stripe</Text>
+            </View>
           )}
-          <Icon
-            name={isError ? "alert-circle" : "arrow-right"}
-            size={24}
-            color="#FFFFFF"
-            style={{ marginLeft: 8 }}
-          />
+        </TouchableOpacity>
+
+        {/* Botón: Mercado Pago */}
+        <TouchableOpacity
+          style={styles.paymentButton}
+          onPress={handleMercadoPago}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <View style={styles.buttonContent}>
+              <Image
+                source={require('../assets/mercadopago.jpg')}
+                style={styles.buttonLogo}
+              />
+              <Text style={styles.continueButtonText}>Pay with Mercado Pago</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -220,16 +321,15 @@ export default function OrderSummaryScreen({ navigation }) {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     paddingHorizontal: 20,
     paddingVertical: 16,
     justifyContent: 'space-between',
@@ -252,17 +352,17 @@ const styles = StyleSheet.create({
   addressLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4B5563',
+    color: '#000000',
     marginBottom: 4,
   },
   addressText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#000000',
     marginBottom: 8,
   },
   changeAddressText: {
     fontSize: 14,
-    color: '#6D28D9',
+    color: '#D32F2F',
     textDecorationLine: 'underline',
   },
   itemsContainer: {
@@ -272,14 +372,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#1F2937',
+    color: '#000000',
   },
   itemBlock: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
@@ -291,7 +391,7 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#000000',
     fontWeight: '600',
   },
   itemRight: {
@@ -300,7 +400,7 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#D32F2F',
     marginRight: 4,
   },
   expandButton: {
@@ -319,7 +419,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
     marginBottom: 4,
-    color: '#4B5563',
+    color: '#000000',
   },
   ingredientRow: {
     flexDirection: 'row',
@@ -333,19 +433,20 @@ const styles = StyleSheet.create({
   },
   ingredientName: {
     fontSize: 13,
-    color: '#4B5563',
+    color: '#000000',
     flex: 1,
   },
   ingredientPrice: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#D32F2F',
+    fontWeight: 'bold',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
@@ -354,26 +455,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  summaryLabel: {
+  summaryText: {
     fontSize: 14,
-    color: '#6B7280',
-  },
-  summaryValue: {
-    fontSize: 14,
-    color: '#111827',
+    color: '#000000',
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 8,
   },
+  totalLabel: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  totalAmount: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
   footer: {
+    flexDirection: 'row',
     padding: 16,
     backgroundColor: '#FFFFFF',
+    justifyContent: 'space-between',
   },
-  continueButton: {
+  paymentButton: {
+    flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -383,5 +491,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonLogo: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+    resizeMode: 'contain',
   },
 });

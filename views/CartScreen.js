@@ -56,7 +56,7 @@ export default function CartScreen({ navigation }) {
   const renderIngredients = (ingredients, type) => (
     <View style={styles.ingredientsContainer}>
       <Text style={styles.ingredientsTitle}>
-        {type === 'included' ? 'Ingredientes incluidos:' : 'Ingredientes extra:'}
+        {type === 'included' ? 'Included Ingredients:' : 'Extra Ingredients:'}
       </Text>
       {ingredients.map((ingredient) => (
         <View key={ingredient.id} style={styles.ingredientItem}>
@@ -85,7 +85,7 @@ export default function CartScreen({ navigation }) {
           <View style={styles.itemTitleContainer}>
             <Text style={styles.itemName}>{item.name}</Text>
             <TouchableOpacity onPress={() => handleRemoveItem(item.id)}>
-              <Icon name="close" size={24} color="#6D28D9" />
+              <Icon name="close" size={24} color="#D32F2F" />
             </TouchableOpacity>
           </View>
           <Text style={styles.itemOption}>{item.option}</Text>
@@ -94,13 +94,13 @@ export default function CartScreen({ navigation }) {
               <TouchableOpacity
                 onPress={() => handleUpdateQuantity(item.id, item.quantity - 1)}
               >
-                <Icon name="minus-circle-outline" size={24} color="#6D28D9" />
+                <Icon name="minus-circle-outline" size={24} color="#D32F2F" />
               </TouchableOpacity>
               <Text style={styles.quantityText}>{item.quantity}</Text>
               <TouchableOpacity
                 onPress={() => handleUpdateQuantity(item.id, item.quantity + 1)}
               >
-                <Icon name="plus-circle-outline" size={24} color="#6D28D9" />
+                <Icon name="plus-circle-outline" size={24} color="#D32F2F" />
               </TouchableOpacity>
             </View>
             <Text style={styles.itemPrice}>
@@ -118,7 +118,7 @@ export default function CartScreen({ navigation }) {
         <Icon
           name={expandedItems[item.id] ? 'chevron-up' : 'chevron-down'}
           size={24}
-          color="#6D28D9"
+          color="#D32F2F"
         />
       </TouchableOpacity>
 
@@ -163,7 +163,7 @@ export default function CartScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mi Carrito</Text>
+        <Text style={styles.headerTitle}>My Cart</Text>
         <TouchableOpacity onPress={handleClearCart}>
           <Icon name="trash-can-outline" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -178,7 +178,7 @@ export default function CartScreen({ navigation }) {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cart-off" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyText}>Tu carrito está vacío</Text>
+            <Text style={styles.emptyText}>Your cart is empty</Text>
           </View>
         }
       />
@@ -190,7 +190,7 @@ export default function CartScreen({ navigation }) {
           <Text style={styles.totalAmount}>${totalGeneral.toFixed(2)}</Text>
         </View>
         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
-          <Text style={styles.checkoutButtonText}>Proceder al pago</Text>
+          <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
           <Icon name="arrow-right" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -202,7 +202,7 @@ export default function CartScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
   },
   headerTitle: {
     fontSize: 20,
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -253,11 +253,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#000000',
   },
   itemOption: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#000000',
     marginBottom: 8,
   },
   itemDetails: {
@@ -272,13 +272,13 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#000000',
     marginHorizontal: 8,
   },
   itemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#6D28D9',
+    color: '#D32F2F',
   },
   expandButton: {
     alignItems: 'center',
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   ingredientsTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#000000',
     marginBottom: 4,
   },
   ingredientItem: {
@@ -306,13 +306,13 @@ const styles = StyleSheet.create({
   },
   ingredientName: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#000000',
     marginLeft: 8,
     flex: 1,
   },
   ingredientPrice: {
     fontSize: 14,
-    color: '#6D28D9',
+    color: '#D32F2F',
     fontWeight: 'bold',
   },
   emptyContainer: {
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#9CA3AF',
+    color: '#000000',
     marginTop: 16,
   },
   footer: {
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -347,18 +347,18 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#000000',
   },
   totalAmount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#6D28D9',
+    color: '#D32F2F',
   },
   checkoutButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderRadius: 12,
     paddingVertical: 16,
   },
@@ -369,3 +369,4 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 });
+

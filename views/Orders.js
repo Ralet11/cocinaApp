@@ -15,21 +15,21 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 
-/* Helper: Devuelve el estilo de tarjeta en base al estado. */
+/* Helper: Returns card style based on status */
 function getCardStyleByStatus(status) {
   const lowerStatus = status?.toLowerCase();
   switch (lowerStatus) {
     case 'pendiente':
-      return { backgroundColor: '#FEF9C3' }; // Amarillo muy claro
+      return { backgroundColor: '#FEF9C3' }; // very light yellow
     case 'aceptada':
-      return { backgroundColor: '#DCFCE7' }; // Verde claro
+      return { backgroundColor: '#DCFCE7' }; // light green
     case 'envio':
-      return { backgroundColor: '#E0F2FE' }; // Azul claro
+      return { backgroundColor: '#E0F2FE' }; // light blue
     case 'finalizada':
-      return { backgroundColor: '#F3F4F6' }; // Gris claro
+      return { backgroundColor: '#F3F4F6' }; // light gray
     case 'rechazada':
     case 'cancelada':
-      return { backgroundColor: '#FEE2E2' }; // Rojo claro
+      return { backgroundColor: '#FEE2E2' }; // light red
     default:
       return { backgroundColor: '#FFFFFF' };
   }
@@ -38,32 +38,33 @@ function getCardStyleByStatus(status) {
 export default function Orders() {
   const navigation = useNavigation();
 
-  // Estados para búsqueda y filtros
+  // State for search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // Modal
+  // Modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const historicOrders = useSelector((state) => state.order.historicOrders);
 
-  // Filtro y búsqueda
+  // Filter and search function
   function applyFilters() {
     let orders = [...historicOrders];
 
-    // Filtrar por estado
+    // Filter by status
     if (filterStatus === 'active') {
       orders = orders.filter(
-        (o) => !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
+        (o) =>
+          !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
       );
     } else if (filterStatus === 'finished') {
-      orders = orders.filter(
-        (o) => ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
+      orders = orders.filter((o) =>
+        ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
       );
     }
 
-    // Búsqueda por code o dirección
+    // Search by order code or delivery address
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       orders = orders.filter((order) => {
@@ -78,7 +79,7 @@ export default function Orders() {
 
   const filteredOrders = applyFilters();
 
-  // Separar en activas e históricas (para mostrar en la vista "all")
+  // Separate active and finished orders (for "all" view)
   const activeOrders = filteredOrders.filter(
     (o) => !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
   );
@@ -86,7 +87,7 @@ export default function Orders() {
     ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
   );
 
-  // Funciones para Modal
+  // Modal functions
   const openModal = (order) => {
     setSelectedOrder(order);
     setModalVisible(true);
@@ -96,7 +97,7 @@ export default function Orders() {
     setModalVisible(false);
   };
 
-  // Navegación al detalle de orden o abrir modal si está finalizada
+  // Navigate to order tracking if active, otherwise open modal for finished orders
   const handlePress = (order) => {
     const lowerStatus = order.status?.toLowerCase();
     if (['finalizada', 'rechazada', 'cancelada'].includes(lowerStatus)) {
@@ -106,10 +107,10 @@ export default function Orders() {
     }
   };
 
-  // Formato de fecha muy simple
+  // Simple date format: YYYY-MM-DD
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    return date.toISOString().split('T')[0];
   };
 
   return (
@@ -118,7 +119,7 @@ export default function Orders() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Orders</Text>
         <View style={styles.filterButton}>
-          <Icon name="tune-vertical" size={24} color="#4C1D95" />
+          <Icon name="tune-vertical" size={24} color="#D32F2F" />
         </View>
       </View>
 
@@ -134,7 +135,7 @@ export default function Orders() {
         />
       </View>
 
-      {/* FILTRO DE ESTATUS */}
+      {/* STATUS FILTER */}
       <View style={styles.filterRow}>
         <TouchableOpacity
           style={[
@@ -188,10 +189,9 @@ export default function Orders() {
         </TouchableOpacity>
       </View>
 
-      {/* LISTADO DE ÓRDENES */}
+      {/* ORDERS LIST */}
       <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-        {filterStatus !== 'all' && (
-          // Si NO estamos en "all", se muestran solo las órdenes resultantes del filtro actual
+        {filterStatus !== 'all' &&
           filteredOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
@@ -212,12 +212,11 @@ export default function Orders() {
               </View>
               <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
             </TouchableOpacity>
-          ))
-        )}
+          ))}
 
         {filterStatus === 'all' && (
           <>
-            {/* ÓRDENES ACTIVAS */}
+            {/* ACTIVE ORDERS */}
             {activeOrders.length > 0 && (
               <Text style={styles.sectionTitle}>Active Orders</Text>
             )}
@@ -243,12 +242,12 @@ export default function Orders() {
               </TouchableOpacity>
             ))}
 
-            {/* SEPARADOR */}
+            {/* SEPARATOR */}
             {activeOrders.length > 0 && finishedOrders.length > 0 && (
               <View style={styles.separator} />
             )}
 
-            {/* ÓRDENES HISTÓRICAS */}
+            {/* HISTORICAL ORDERS */}
             {finishedOrders.length > 0 && (
               <Text style={styles.sectionTitle}>Historical Orders</Text>
             )}
@@ -277,7 +276,7 @@ export default function Orders() {
         )}
       </ScrollView>
 
-      {/* MODAL DE DETALLES (para pedidos finalizados) */}
+      {/* MODAL FOR ORDER DETAILS (for finished orders) */}
       {selectedOrder && (
         <Modal
           visible={modalVisible}
@@ -334,7 +333,6 @@ export default function Orders() {
   );
 }
 
-/* Estilos */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -352,7 +350,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4C1D95',
+    color: '#D32F2F',
   },
   filterButton: {
     width: 40,
@@ -383,10 +381,10 @@ const styles = StyleSheet.create({
     paddingLeft: 48,
     paddingRight: 16,
     fontSize: 16,
-    color: '#4B5563',
+    color: '#000000',
   },
 
-  /* FILTROS */
+  /* FILTERS */
   filterRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -400,18 +398,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   filterOptionActive: {
-    backgroundColor: '#4C1D95',
+    backgroundColor: '#D32F2F',
   },
   filterOptionText: {
     fontSize: 14,
-    color: '#4C1D95',
+    color: '#D32F2F',
     fontWeight: '500',
   },
   filterOptionTextActive: {
     color: '#FFFFFF',
   },
 
-  /* LISTA DE ÓRDENES */
+  /* ORDERS LIST */
   ordersList: {
     paddingHorizontal: 20,
     marginTop: 8,
@@ -419,7 +417,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4C1D95',
+    color: '#D32F2F',
     marginVertical: 8,
   },
   separator: {
@@ -428,14 +426,13 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
 
-  /* ITEM DE ORDEN */
+  /* ORDER ITEM */
   orderItem: {
     flexDirection: 'row',
     borderRadius: 12,
     marginBottom: 16,
     padding: 16,
-    // Sombra
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
@@ -453,17 +450,17 @@ const styles = StyleSheet.create({
   orderTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#000000',
     marginBottom: 2,
   },
   orderAddress: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#000000',
     marginBottom: 4,
   },
   orderStatus: {
     fontSize: 14,
-    color: '#4C1D95',
+    color: '#D32F2F',
     fontWeight: '500',
     marginBottom: 6,
   },
@@ -475,7 +472,7 @@ const styles = StyleSheet.create({
   orderTotal: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4C1D95',
+    color: '#D32F2F',
   },
   orderDate: {
     position: 'absolute',
@@ -485,7 +482,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
-  /* MODAL DE DETALLES */
+  /* MODAL */
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -493,27 +490,27 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4C1D95',
+    color: '#D32F2F',
     marginBottom: 16,
   },
   modalText: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#4B5563',
+    color: '#000000',
   },
   modalSubtitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
-    color: '#4C1D95',
+    color: '#D32F2F',
   },
   productItem: {
     flexDirection: 'row',
@@ -531,26 +528,26 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#000000',
   },
   productDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#000000',
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 14,
-    color: '#4C1D95',
+    color: '#D32F2F',
   },
   closeButton: {
     marginTop: 16,
-    backgroundColor: '#4C1D95',
+    backgroundColor: '#D32F2F',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   closeButtonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },

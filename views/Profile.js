@@ -8,7 +8,7 @@ import { logout } from '../redux/slices/user.slice';
 const ProfileView = () => {
   const userName = useSelector((state) => state?.user?.userInfo?.name);
   const navigation = useNavigation();
-  const dispatch = useDispatch()
+  const dispatch = useDispatch();
 
   const sections = [
     { title: 'Personal Information', icon: 'account-outline', route: 'PersonalInfo' },
@@ -42,7 +42,7 @@ const ProfileView = () => {
             style={styles.section} 
             onPress={() => navigation.navigate(section.route)}
           >
-            <Icon name={section.icon} size={24} color="#6D28D9" style={styles.sectionIcon} />
+            <Icon name={section.icon} size={24} color="#D32F2F" style={styles.sectionIcon} />
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <Icon name="chevron-right" size={24} color="#9CA3AF" />
           </TouchableOpacity>
@@ -60,13 +60,13 @@ const ProfileView = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    color: '#E5E7EB',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   userName: {
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginHorizontal: 12,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: '#000000',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     margin: 20,
     padding: 16,
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderRadius: 12,
   },
   logoutIcon: {

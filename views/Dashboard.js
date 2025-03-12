@@ -128,6 +128,7 @@ const Dashboard = () => {
           }
         );
         const closestPartner = resp.data.closestPartner;
+        console.log(closestPartner, "closr")
         setPartner(closestPartner);
         dispatch(setPartnerId(closestPartner.id));
   
@@ -138,6 +139,8 @@ const Dashboard = () => {
             headers: { Authorization: `Bearer ${token}` }, // Token incluido aquí
           }
         );
+
+        console.log(productsResp.data, "prodresp")
         setGroupedProducts(productsResp.data.cat || {});
       } catch (error) {
         console.error('Error fetching partner/products:', error);
@@ -185,7 +188,7 @@ const Dashboard = () => {
   if (isScreenLoading) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#6D28D9" />
+        <ActivityIndicator size="large" color="#D32F2F" />
         <Text style={styles.loaderText}>Cargando datos...</Text>
       </SafeAreaView>
     );
@@ -240,7 +243,7 @@ const Dashboard = () => {
             placeholderTextColor="#9CA3AF"
           />
           <TouchableOpacity style={styles.filterButton}>
-            <Icon name="tune-vertical" size={24} color="#6D28D9" />
+            <Icon name="tune-vertical" size={24} color="#D32F2F" />
           </TouchableOpacity>
         </View>
 
@@ -292,16 +295,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F5F5F5',
   },
   loaderText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#6D28D9',
+    color: '#D32F2F',
   },
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
@@ -309,7 +312,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#6D28D9',
+    backgroundColor: '#D32F2F',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
   },
   addressType: {
     fontSize: 12,
-    color: '#E5E7EB',
+    color: '#FFFFFF',
     marginTop: 2,
   },
   cartButton: {
@@ -341,7 +344,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     right: -5,
-    backgroundColor: '#EF4444',
+    backgroundColor: 'black',
     borderRadius: 10,
     width: 20,
     height: 20,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#212121',
     marginBottom: 16,
   },
   featuredScroll: {},

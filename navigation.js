@@ -22,6 +22,7 @@ import Coupons from './views/Coupons';
 import Terms from './views/TermsAndConditions';
 import PersonalInfo from './views/PersonalInfo';
 import useSocket from './config/socket';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -29,12 +30,12 @@ const customTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#4C1D95',
-    background: '#FFFFFF',
-    card: '#F3F4F6',
-    text: '#1F2937',
-    border: '#E5E7EB',
-    notification: '#EF4444',
+    primary: '#D32F2F',    // Rojo
+    background: '#FFFFFF', // Blanco
+    card: '#FFFFFF',       // Tarjetas y barras con fondo blanco
+    text: '#000000',       // Texto en negro
+    border: '#000000',     // Bordes en negro
+    notification: '#D32F2F', // Rojo
   },
 };
 
@@ -80,7 +81,7 @@ function HomeTabs() {
 }
 
 export default function AppNavigation() {
-useSocket()
+  useSocket();
 
   return (
     <NavigationContainer theme={customTheme}>
@@ -101,18 +102,12 @@ useSocket()
         <Stack.Screen name="Profile" component={ProfileView} />
         <Stack.Screen name="Addresses" component={AddressesView} />
         <Stack.Screen name="SelectNewAddress" component={SelectNewAddress} />
-        <Stack.Screen
-          name="FirstAddressScreen"
-          component={FirstAddressScreen}
-
-        />
+        <Stack.Screen name="FirstAddressScreen" component={FirstAddressScreen} />
         <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
-
         <Stack.Screen name="PersonalInfo" component={PersonalInfo} />
         <Stack.Screen name="Coupons" component={Coupons} />
         <Stack.Screen name="Terms" component={Terms} />
       </Stack.Navigator>
-
     </NavigationContainer>
   );
 }

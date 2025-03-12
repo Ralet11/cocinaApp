@@ -50,7 +50,7 @@ const AddressesView = ({ navigation }) => {
   };
 
   const handleSelectAddress = (address) => {
-    // Guardar todos los datos relevantes de la dirección en Redux
+    // Guardar la dirección seleccionada en Redux
     dispatch(setCurrentAddress(address));
   };
 
@@ -58,14 +58,14 @@ const AddressesView = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#000" />
+          <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Dirección de entrega</Text>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B3DFF" />
+          <ActivityIndicator size="large" color="#D32F2F" />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -80,13 +80,12 @@ const AddressesView = ({ navigation }) => {
           {addresses.length > 0 ? (
             addresses.map((address) => {
               const isSelected = currentAddress?.id === address.id;
-
               return (
                 <TouchableOpacity
                   key={address.id}
                   style={[
                     styles.addressCard,
-                    isSelected && styles.selectedAddressCard, // Aplicar estilo si está seleccionada
+                    isSelected && styles.selectedAddressCard, // Aplica estilo si está seleccionada
                   ]}
                   onPress={() => handleSelectAddress(address)}
                   activeOpacity={0.8}
@@ -98,7 +97,7 @@ const AddressesView = ({ navigation }) => {
                   </View>
 
                   {isSelected && (
-                    <Icon name="check-circle" size={20} color="#8B3DFF" style={styles.tickIcon} />
+                    <Icon name="check-circle" size={20} color="#D32F2F" style={styles.tickIcon} />
                   )}
 
                   <TouchableOpacity
@@ -124,14 +123,16 @@ export default AddressesView;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5', // Mismo fondo que el Dashboard
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#D32F2F', // Cambiado a rojo para coincidir con el Dashboard
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: '#FFFFFF', // Texto blanco
     marginLeft: 16,
   },
   backButton: {
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#8B3DFF',
+    backgroundColor: '#D32F2F', // Igual que el header y botones del Dashboard
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
   },
   selectedAddressCard: {
     borderWidth: 1,
-    borderColor: '#8B3DFF',
+    borderColor: '#D32F2F', // Cambiado a rojo
   },
   locationIcon: {
     marginRight: 12,

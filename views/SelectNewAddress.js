@@ -113,16 +113,16 @@ const SelectNewAddress = ({ navigation, route }) => {
     if (details && details.geometry) {
       const { lat, lng } = details.geometry.location;
       const addressComponents = details.address_components;
-  
+
       // Helper para obtener valores de address_components
       const getComponent = (type) =>
         addressComponents.find((component) => component.types.includes(type))?.long_name || '';
-  
+
       const city = getComponent('locality');
       const state = getComponent('administrative_area_level_1');
-      const zipCode = getComponent('postal_code'); // Capturamos el zipCode
+      const zipCode = getComponent('postal_code');
       const country = getComponent('country');
-  
+
       setMarkerCoords({ latitude: lat, longitude: lng });
       setRegion({
         latitude: lat,
@@ -130,17 +130,17 @@ const SelectNewAddress = ({ navigation, route }) => {
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       });
-  
+
       // Actualizamos el estado con los valores obtenidos
       setAddress((prev) => ({
         ...prev,
         street: details.formatted_address || data.description,
         city,
         state,
-        zipCode: zipCode || '', // Si no está disponible, lo dejamos vacío
+        zipCode: zipCode || '',
         country,
       }));
-  
+
       if (mapRef.current) {
         mapRef.current.animateToRegion(
           {
@@ -154,7 +154,6 @@ const SelectNewAddress = ({ navigation, route }) => {
       }
     }
   };
-  
 
   const handleMapPress = (e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -211,7 +210,7 @@ const SelectNewAddress = ({ navigation, route }) => {
       <Icon
         name={icon}
         size={24}
-        color={address.type === type ? '#8B3DFF' : '#666'}
+        color={address.type === type ? '#D32F2F' : '#666'}
       />
       <Text
         style={[
@@ -228,7 +227,7 @@ const SelectNewAddress = ({ navigation, route }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#000" />
+          <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {addressId ? 'Editar dirección' : 'Agregar nueva dirección'}
@@ -308,6 +307,8 @@ const SelectNewAddress = ({ navigation, route }) => {
   );
 };
 
+export default SelectNewAddress;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -318,14 +319,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#D32F2F', // Cambiado a rojo para consistencia
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: '#FFF', // Texto en blanco
     marginLeft: 16,
   },
   backButton: {
@@ -386,10 +387,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   typeButtonTextActive: {
-    color: '#8B3DFF',
+    color: '#D32F2F', // Activo en rojo
   },
   saveButton: {
-    backgroundColor: '#8B3DFF',
+    backgroundColor: '#D32F2F', // Botón de guardar en rojo
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -400,5 +401,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default SelectNewAddress;
