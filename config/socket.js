@@ -1,61 +1,103 @@
-// useSocket.js
+// ─────────────────────────────────────────────────────────────────────────────
+// hooks/useSocket.js      ← REEMPLAZA TODO ESTE ARCHIVO
+// ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
-import { useSelector } from 'react-redux';
-import { store } from '../redux/store';
-import { updateOrderState } from '../redux/slices/order.slice';
+import { io }                 from 'socket.io-client';
+import axios                  from 'react-native-axios';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  updateOrderState,
+  addHistoricOrder,
+} from '../redux/slices/order.slice';
+import { API_URL } from '@env';
 
-// O si prefieres, usa la variable de entorno: const socketUrl = API_URL;
-/* const SOCKET_URL = 'http://192.168.0.251:3000'; */
-const SOCKET_URL = 'https://54.90.29.65'
+import { navigationRef } from '../navigation';
+import { store }         from '../redux/store';
+
+/* ───────── URL del socket ─────────────────────────────────────────── */
+const DEV_SOCKET = 'http://192.168.0.251:3000';
+const SOCKET_URL =
+  process.env.NODE_ENV === 'development'
+    ? DEV_SOCKET
+    : process.env.SOCKET_URL || `${API_URL.replace(/\/+$/, '')}`;
 
 export default function useSocket() {
-  // 1. Obtenemos el userInfo (donde está el userId)
-  const userInfo = useSelector((state) => state.user.userInfo);
-
-  // 2. Usamos useRef para guardar la instancia del socket sin que se pierda en cada render
+  const dispatch  = useDispatch();
+  const userInfo  = useSelector((s) => s.user.userInfo);
+  const token     = useSelector((s) => s.user.token);
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Solo conectamos si existe userInfo y, por ende, userInfo.id
-    if (userInfo?.id) {
-      // 3. Inicializamos el socket
-      socketRef.current = io(SOCKET_URL, {
-        transports: ['websocket'],
-        autoConnect: true,
-      });
+    if (!userInfo?.id) return;
+    if (socketRef.current) return;
 
-      // 4. Escuchamos el evento `connect`
-      socketRef.current.on('connect', () => {
-        console.log('Socket conectado:', socketRef.current.id);
-        // 4.1. Emitimos el joinRoom con el userId
-        socketRef.current.emit('joinRoom', userInfo.id);
-      });
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket'],
+      autoConnect: false,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1500,
+      auth: { token },
+    });
 
-      // 5. Escuchamos el evento "state changed"
-      socketRef.current.on('state changed', (data) => {
-        console.log("Evento 'state changed' recibido:", data);
-        const { orderId, status } = data;
+    socketRef.current.connect();
 
-        // Despacha la acción de Redux para actualizar el estado de la orden
-        store.dispatch(updateOrderState({ orderId, newStatus: status }));
-      });
+    /* ----- Conexión base ----- */
+    socketRef.current.on('connect', () => {
+      console.log('[socket] connected:', socketRef.current.id);
+      socketRef.current.emit('joinRoom', userInfo.id);
+    });
 
-      // 6. Manejo de errores
-      socketRef.current.on('connect_error', (err) => {
-        console.error('Error al conectar al socket:', err);
-      });
+    socketRef.current.on('disconnect', (reason) =>
+      console.log('[socket] disconnected:', reason),
+    );
 
-      // 7. Limpieza: al desmontar el componente o cambiar de usuario, desconectamos el socket
-      return () => {
-        console.log('Desconectando socket...');
-        if (socketRef.current) {
-          socketRef.current.disconnect();
+    socketRef.current.on('connect_error', (err) =>
+      console.error('[socket] connect_error:', err.message),
+    );
+
+    /* ----- Evento principal ----- */
+    socketRef.current.on(
+      'order_state_changed',
+      async ({ orderId, status }) => {
+        console.log('[socket] order_state_changed:', orderId, status);
+
+        /* 1️⃣ Actualizar estado en Redux */
+        dispatch(updateOrderState({ orderId, newStatus: status }));
+
+        /* 2️⃣ Si la orden no existe todavía, obtenerla completa y guardarla */
+        const {
+          order: { activeOrders, historicOrders },
+        } = store.getState();
+
+        const known =
+          activeOrders.some((o) => o.id === orderId) ||
+          historicOrders.some((o) => o.id === orderId);
+
+        if (!known) {
+          try {
+            const { data: fullOrder } = await axios.get(
+              `${API_URL}/order/${orderId}`,
+            );
+            dispatch(addHistoricOrder(fullOrder)); // guarda objeto completo
+          } catch (e) {
+            console.error('[socket] error fetching order', e.message);
+          }
         }
-      };
-    }
-  }, [userInfo?.id]); // se reejecuta si el userId cambia
 
-  // 8. Devuelve el socketRef por si necesitas usarlo en otro lado
+        /* 3️⃣ Navegar a tracking si la navegación está lista */
+        if (navigationRef.isReady()) {
+          navigationRef.navigate('OrderTracking', { orderId });
+        }
+      },
+    );
+
+    /* ----- Limpieza ----- */
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [userInfo?.id, token, dispatch]);
+
   return socketRef.current;
 }

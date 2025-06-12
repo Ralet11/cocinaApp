@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
+// views/FirstAddressScreen.jsx
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,11 +19,21 @@ import { useSelector } from 'react-redux';
 import { GOOGLE_API_KEY, API_URL } from '@env';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
-const FirstAddressScreen = () => {
-  const token = useSelector((state) => state?.user?.userInfo?.token);
-  const user_id = useSelector((state) => state?.user?.userInfo?.id);
-  const navigation = useNavigation();
+export default function FirstAddressScreen() {
+  const { t, i18n }     = useTranslation();
+  const currentLang     = useSelector(s => s.user.language);
+  const token           = useSelector(s => s.user.userInfo.token);
+  const user_id         = useSelector(s => s.user.userInfo.id);
+  const navigation      = useNavigation();
+
+  // sync i18n with Redux language
+  useEffect(() => {
+    if (currentLang) {
+      i18n.changeLanguage(currentLang);
+    }
+  }, [currentLang]);
 
   const [address, setAddress] = useState({
     street: '',
@@ -34,66 +45,57 @@ const FirstAddressScreen = () => {
     zipCode: '',
     country: '',
   });
-
   const [region, setRegion] = useState({
     latitude: 40.7128,
     longitude: -74.0060,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
-
   const [markerCoords, setMarkerCoords] = useState({
     latitude: 40.7128,
     longitude: -74.0060,
   });
 
   const googlePlacesRef = useRef(null);
-  const mapRef = useRef(null);
+  const mapRef          = useRef(null);
 
   const googleQuery = useMemo(() => ({
     key: GOOGLE_API_KEY,
-    language: 'en',
-  }), []);
+    language: currentLang || 'en',
+  }), [currentLang]);
 
   const handlePlaceSelect = (data, details) => {
-    if (details && details.geometry) {
+    if (details?.geometry) {
       const { lat, lng } = details.geometry.location;
-      const addressComponents = details.address_components;
-
-      const getComponent = (type) =>
-        addressComponents.find((component) => component.types.includes(type))?.long_name || '';
+      const comps = details.address_components;
+      const getComp = type =>
+        comps.find(c => c.types.includes(type))?.long_name || '';
 
       setMarkerCoords({ latitude: lat, longitude: lng });
       setRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 });
-      setAddress((prev) => ({
+      setAddress(prev => ({
         ...prev,
         street: details.formatted_address || data.description,
-        city: getComponent('locality'),
-        state: getComponent('administrative_area_level_1'),
-        zipCode: getComponent('postal_code') || '',
-        country: getComponent('country'),
+        city: getComp('locality'),
+        state: getComp('administrative_area_level_1'),
+        zipCode: getComp('postal_code') || '',
+        country: getComp('country'),
       }));
-      mapRef.current?.animateToRegion({
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
+      mapRef.current?.animateToRegion(
+        { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        1000
+      );
     }
   };
 
-  const handleMapPress = (e) => {
+  const handleMapPress = e => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarkerCoords({ latitude, longitude });
-    setRegion((prev) => ({
-      ...prev,
-      latitude,
-      longitude,
-    }));
+    setRegion(prev => ({ ...prev, latitude, longitude }));
   };
 
   const handleSaveAddress = async () => {
-    const data = {
+    const payload = {
       user_id,
       street: address.street,
       floor: address.floor,
@@ -106,30 +108,31 @@ const FirstAddressScreen = () => {
       zipCode: address.zipCode,
       country: address.country,
     };
-
     try {
-      await axios.post(`${API_URL}/user/addAddress`, data, {
+      await axios.post(`${API_URL}/user/addAddress`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Address saved');
       navigation.navigate('HomeTabs', { refresh: true });
-    } catch (error) {
-      console.error('Error saving address:', error);
-      alert('There was a problem saving the address.');
+    } catch (err) {
+      console.error('Error saving address:', err);
+      alert(t('firstAddress.errorSaving'));
     }
   };
 
-  const AddressTypeButton = ({ type, icon, label }) => (
+  const AddressTypeButton = ({ type, icon, labelKey }) => (
     <TouchableOpacity
       style={[
         styles.typeButton,
         address.type === type && styles.typeButtonActive,
       ]}
-      onPress={() => setAddress((prev) => ({ ...prev, type }))}
+      onPress={() => setAddress(prev => ({ ...prev, type }))}
     >
       <Icon name={icon} size={20} color={address.type === type ? '#8B3DFF' : '#666'} />
-      <Text style={[styles.typeButtonText, address.type === type && styles.typeButtonTextActive]}>
-        {label}
+      <Text style={[
+        styles.typeButtonText,
+        address.type === type && styles.typeButtonTextActive,
+      ]}>
+        {t(labelKey)}
       </Text>
     </TouchableOpacity>
   );
@@ -137,16 +140,20 @@ const FirstAddressScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContentContainer}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Add Your First Address</Text>
-            <Text style={styles.headerSubtitle}>An address is required to get started</Text>
+            <Text style={styles.headerTitle}>
+              {t('firstAddress.headerTitle')}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {t('firstAddress.headerSubtitle')}
+            </Text>
           </View>
 
           <View style={styles.mapContainer}>
@@ -163,7 +170,7 @@ const FirstAddressScreen = () => {
           <View style={styles.form}>
             <GooglePlacesAutocomplete
               ref={googlePlacesRef}
-              placeholder="Address*"
+              placeholder={t('firstAddress.placeholder')}
               fetchDetails
               debounce={300}
               query={googleQuery}
@@ -171,7 +178,8 @@ const FirstAddressScreen = () => {
               styles={styles.googleStyles}
               textInputProps={{
                 value: address.street,
-                onChangeText: (text) => setAddress((prev) => ({ ...prev, street: text })),
+                onChangeText: text =>
+                  setAddress(prev => ({ ...prev, street: text })),
               }}
             />
 
@@ -179,8 +187,8 @@ const FirstAddressScreen = () => {
               <TextInput
                 style={styles.input}
                 value={address.floor}
-                onChangeText={(text) => setAddress((prev) => ({ ...prev, floor: text }))}
-                placeholder="Floor / Apt (e.g., 3B)"
+                onChangeText={text => setAddress(prev => ({ ...prev, floor: text }))}
+                placeholder={t('firstAddress.floorPlaceholder')}
               />
             </View>
 
@@ -188,39 +196,34 @@ const FirstAddressScreen = () => {
               <TextInput
                 style={styles.input}
                 value={address.comments}
-                onChangeText={(text) => setAddress((prev) => ({ ...prev, comments: text }))}
-                placeholder="Comments (e.g., Doorbell doesn't work, please call)"
+                onChangeText={text => setAddress(prev => ({ ...prev, comments: text }))}
+                placeholder={t('firstAddress.commentsPlaceholder')}
                 multiline
               />
             </View>
 
             <View style={styles.typeContainer}>
-              <AddressTypeButton type="home" icon="home" label="Home" />
-              <AddressTypeButton type="work" icon="briefcase" label="Work" />
-              <AddressTypeButton type="other" icon="map-marker" label="Other" />
+              <AddressTypeButton type="home"   icon="home"      labelKey="firstAddress.home" />
+              <AddressTypeButton type="work"   icon="briefcase" labelKey="firstAddress.work" />
+              <AddressTypeButton type="other"  icon="map-marker" labelKey="firstAddress.other" />
             </View>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveAddress}>
-              <Text style={styles.saveButtonText}>Save Address</Text>
+              <Text style={styles.saveButtonText}>
+                {t('firstAddress.saveButton')}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  keyboardAvoidingView: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   header: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -243,16 +246,9 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height * 0.3,
     marginBottom: 12,
   },
-  map: {
-    flex: 1,
-    borderRadius: 8,
-  },
-  form: {
-    paddingHorizontal: 16,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
+  map: { flex: 1, borderRadius: 8 },
+  form: { paddingHorizontal: 16 },
+  inputGroup: { marginBottom: 12 },
   input: {
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
@@ -278,9 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     borderRadius: 8,
   },
-  typeButtonActive: {
-    backgroundColor: '#C7D2FE',
-  },
+  typeButtonActive: { backgroundColor: '#C7D2FE' },
   typeButtonText: {
     marginLeft: 4,
     fontSize: 12,
@@ -333,6 +327,3 @@ const styles = StyleSheet.create({
     },
   },
 });
-
-export default FirstAddressScreen;
-

@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  StyleSheet,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,15 +13,23 @@ import MapView, { Marker } from 'react-native-maps';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import axios from 'react-native-axios';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { GOOGLE_API_KEY, API_URL } from '@env';
 
 const SelectNewAddress = ({ navigation, route }) => {
-  const { addressParam } = route.params || {};
-  const token = useSelector((state) => state.user.userInfo.token);
-  const user_id = useSelector((state) => state.user.userInfo.id);
-  const [addressId, setAddressId] = useState(null);
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector(s => s.user.language);
 
-  // Estado para los campos de dirección
+  // sincronizar idioma
+  useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
+
+  const { addressParam } = route.params || {};
+  const token   = useSelector(s => s.user.userInfo.token);
+  const user_id = useSelector(s => s.user.userInfo.id);
+
+  const [addressId, setAddressId] = useState(null);
   const [address, setAddress] = useState({
     street: '',
     floor: '',
@@ -32,57 +40,49 @@ const SelectNewAddress = ({ navigation, route }) => {
     zipCode: '',
     country: '',
   });
-
   const [region, setRegion] = useState({
     latitude: -34.603722,
     longitude: -58.381592,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
-
   const [markerCoords, setMarkerCoords] = useState({
     latitude: -34.603722,
     longitude: -58.381592,
   });
 
-  const googlePlacesRef = useRef(null);
-  const mapRef = useRef(null);
-  const hasAddressParamBeenHandled = useRef(false);
+  const googlePlacesRef = useRef();
+  const mapRef          = useRef();
+  const handled         = useRef(false);
 
-  const googleQuery = useMemo(() => {
-    return {
-      key: GOOGLE_API_KEY,
-      language: 'es',
-    };
-  }, [GOOGLE_API_KEY]);
+  const googleQuery = useMemo(() => ({
+    key: GOOGLE_API_KEY,
+    language: currentLang || 'es',
+  }), [currentLang]);
 
-  const googleStyles = useMemo(
-    () => ({
-      container: { flex: 0 },
-      textInputContainer: {
-        backgroundColor: '#f5f5f5',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-      },
-      textInput: {
-        height: 44,
-        fontSize: 15,
-        backgroundColor: '#f5f5f5',
-      },
-      listView: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        marginTop: 8,
-      },
-    }),
-    []
-  );
+  const googleStyles = {
+    container: { flex: 0 },
+    textInputContainer: {
+      backgroundColor: '#f5f5f5',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+    },
+    textInput: {
+      height: 44,
+      fontSize: 15,
+      backgroundColor: '#f5f5f5',
+    },
+    listView: {
+      backgroundColor: '#fff',
+      borderRadius: 8,
+      marginTop: 8,
+    },
+  };
 
   useEffect(() => {
-    if (addressParam && !hasAddressParamBeenHandled.current) {
+    if (addressParam && !handled.current) {
       setAddressId(addressParam.id);
-      setAddress((prev) => ({
-        ...prev,
+      setAddress({
         street: addressParam.street || '',
         floor: addressParam.floor || '',
         comments: addressParam.comments || '',
@@ -91,8 +91,7 @@ const SelectNewAddress = ({ navigation, route }) => {
         state: addressParam.state || '',
         zipCode: addressParam.zipCode || '',
         country: addressParam.country || '',
-      }));
-
+      });
       if (addressParam.latitude && addressParam.longitude) {
         setMarkerCoords({
           latitude: addressParam.latitude,
@@ -105,68 +104,42 @@ const SelectNewAddress = ({ navigation, route }) => {
           longitudeDelta: 0.01,
         });
       }
-      hasAddressParamBeenHandled.current = true;
+      handled.current = true;
     }
   }, [addressParam]);
 
   const handlePlaceSelect = (data, details) => {
-    if (details && details.geometry) {
-      const { lat, lng } = details.geometry.location;
-      const addressComponents = details.address_components;
+    if (!details?.geometry) return;
+    const { lat, lng } = details.geometry.location;
+    const comps = details.address_components;
+    const getComp = type =>
+      comps.find(c => c.types.includes(type))?.long_name || '';
+    const city    = getComp('locality');
+    const state   = getComp('administrative_area_level_1');
+    const zipCode = getComp('postal_code');
+    const country = getComp('country');
 
-      // Helper para obtener valores de address_components
-      const getComponent = (type) =>
-        addressComponents.find((component) => component.types.includes(type))?.long_name || '';
-
-      const city = getComponent('locality');
-      const state = getComponent('administrative_area_level_1');
-      const zipCode = getComponent('postal_code');
-      const country = getComponent('country');
-
-      setMarkerCoords({ latitude: lat, longitude: lng });
-      setRegion({
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-
-      // Actualizamos el estado con los valores obtenidos
-      setAddress((prev) => ({
-        ...prev,
-        street: details.formatted_address || data.description,
-        city,
-        state,
-        zipCode: zipCode || '',
-        country,
-      }));
-
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            latitude: lat,
-            longitude: lng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          1000
-        );
-      }
-    }
+    setMarkerCoords({ latitude: lat, longitude: lng });
+    setRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+    setAddress(prev => ({
+      ...prev,
+      street: details.formatted_address || data.description,
+      city, state, zipCode, country,
+    }));
+    mapRef.current?.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+      1000
+    );
   };
 
-  const handleMapPress = (e) => {
+  const handleMapPress = e => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarkerCoords({ latitude, longitude });
-    setRegion((prev) => ({
-      ...prev,
-      latitude,
-      longitude,
-    }));
+    setRegion(prev => ({ ...prev, latitude, longitude }));
   };
 
   const handleSaveAddress = async () => {
-    const data = {
+    const payload = {
       user_id,
       street: address.street,
       floor: address.floor,
@@ -182,30 +155,28 @@ const SelectNewAddress = ({ navigation, route }) => {
 
     try {
       if (addressId) {
-        await axios.put(`${API_URL}/user/updateAddress/${addressId}`, data, {
+        await axios.put(`${API_URL}/user/updateAddress/${addressId}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log('Dirección actualizada');
       } else {
-        await axios.post(`${API_URL}/user/addAddress`, data, {
+        await axios.post(`${API_URL}/user/addAddress`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log('Dirección guardada');
       }
       navigation.goBack();
-    } catch (error) {
-      console.error('Error al guardar la dirección:', error);
-      alert('Hubo un problema al guardar la dirección.');
+    } catch (err) {
+      console.error('Error saving address:', err);
+      alert(t('selectAddress.errorSave'));
     }
   };
 
-  const AddressTypeButton = ({ type, icon, label }) => (
+  const TypeButton = ({ type, icon, labelKey }) => (
     <TouchableOpacity
       style={[
         styles.typeButton,
         address.type === type && styles.typeButtonActive,
       ]}
-      onPress={() => setAddress((prev) => ({ ...prev, type }))}
+      onPress={() => setAddress(prev => ({ ...prev, type }))}
     >
       <Icon
         name={icon}
@@ -218,7 +189,7 @@ const SelectNewAddress = ({ navigation, route }) => {
           address.type === type && styles.typeButtonTextActive,
         ]}
       >
-        {label}
+        {t(labelKey)}
       </Text>
     </TouchableOpacity>
   );
@@ -230,7 +201,9 @@ const SelectNewAddress = ({ navigation, route }) => {
           <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {addressId ? 'Editar dirección' : 'Agregar nueva dirección'}
+          {addressId
+            ? t('selectAddress.headerEdit')
+            : t('selectAddress.headerAdd')}
         </Text>
       </View>
 
@@ -249,56 +222,55 @@ const SelectNewAddress = ({ navigation, route }) => {
         <View style={styles.searchContainer}>
           <GooglePlacesAutocomplete
             ref={googlePlacesRef}
-            placeholder="Dirección*"
+            placeholder={t('selectAddress.searchPlaceholder')}
             fetchDetails
             minLength={2}
             debounce={300}
             query={googleQuery}
             onPress={handlePlaceSelect}
             styles={googleStyles}
-            textInputProps={{
-              value: address.street,
-              onChangeText: (text) =>
-                setAddress((prev) => ({ ...prev, street: text })),
-            }}
+            predefinedPlaces={[]}
+            textInputProps={{}}
           />
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Piso / Depto</Text>
+            <Text style={styles.label}>{t('selectAddress.floorLabel')}</Text>
             <TextInput
               style={styles.input}
               value={address.floor}
-              onChangeText={(text) =>
-                setAddress((prev) => ({ ...prev, floor: text }))
+              onChangeText={text =>
+                setAddress(prev => ({ ...prev, floor: text }))
               }
-              placeholder="Ej: 3B"
+              placeholder={t('selectAddress.floorPlaceholder')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Comentarios</Text>
+            <Text style={styles.label}>{t('selectAddress.commentsLabel')}</Text>
             <TextInput
               style={styles.input}
               value={address.comments}
-              onChangeText={(text) =>
-                setAddress((prev) => ({ ...prev, comments: text }))
+              onChangeText={text =>
+                setAddress(prev => ({ ...prev, comments: text }))
               }
-              placeholder="Ej: No anda el timbre, llamar"
+              placeholder={t('selectAddress.commentsPlaceholder')}
               multiline
             />
           </View>
 
           <View style={styles.typeContainer}>
-            <AddressTypeButton type="home" icon="home" label="Casa" />
-            <AddressTypeButton type="work" icon="briefcase" label="Trabajo" />
-            <AddressTypeButton type="other" icon="map-marker" label="Otro" />
+            <TypeButton type="home" icon="home" labelKey="selectAddress.typeHome" />
+            <TypeButton type="work" icon="briefcase" labelKey="selectAddress.typeWork" />
+            <TypeButton type="other" icon="map-marker" labelKey="selectAddress.typeOther" />
           </View>
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSaveAddress}>
             <Text style={styles.saveButtonText}>
-              {addressId ? 'Actualizar dirección' : 'Guardar dirección'}
+              {addressId
+                ? t('selectAddress.buttonUpdate')
+                : t('selectAddress.buttonSave')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -309,56 +281,35 @@ const SelectNewAddress = ({ navigation, route }) => {
 
 export default SelectNewAddress;
 
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#D32F2F', // Cambiado a rojo para consistencia
+    backgroundColor: '#D32F2F',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF', // Texto en blanco
-    marginLeft: 16,
-  },
-  backButton: {
-    padding: 4,
-  },
-  mapContainer: {
-    height: Dimensions.get('window').height * 0.35,
-  },
-  map: {
-    flex: 1,
-  },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  headerTitle: { fontSize: 16, fontWeight: '600', color: '#FFF', marginLeft: 16 },
+  backButton: { padding: 4 },
+
+  mapContainer: { height: Dimensions.get('window').height * 0.35 },
+  map: { flex: 1 },
+
+  contentContainer: { flex: 1, backgroundColor: '#fff' },
   searchContainer: {
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  form: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
+
+  form: { padding: 16 },
+  inputGroup: { marginBottom: 16 },
+  label: { fontSize: 14, color: '#666', marginBottom: 8 },
   input: {
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
@@ -366,6 +317,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 44,
   },
+
   typeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -378,26 +330,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
   },
-  typeButtonActive: {
-    backgroundColor: '#F7F2FF',
-  },
-  typeButtonText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#666',
-  },
-  typeButtonTextActive: {
-    color: '#D32F2F', // Activo en rojo
-  },
+  typeButtonActive: { backgroundColor: '#F7F2FF' },
+  typeButtonText: { marginTop: 4, fontSize: 12, color: '#666' },
+  typeButtonTextActive: { color: '#D32F2F' },
+
   saveButton: {
-    backgroundColor: '#D32F2F', // Botón de guardar en rojo
+    backgroundColor: '#D32F2F',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
   },
-  saveButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
 });

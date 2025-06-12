@@ -1,5 +1,9 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// redux/slices/order.slice.js     ← copia completa, con la lógica pedida
+// ─────────────────────────────────────────────────────────────────────────────
 import { createSlice } from '@reduxjs/toolkit';
 
+/* ───────────────────────── Initial State ───────────────────────── */
 const initialState = {
   currentOrder: {
     id: null,
@@ -13,75 +17,79 @@ const initialState = {
     status: 'pendiente',
   },
   historicOrders: [],
-  activeOrders: [], // ← Añade esta propiedad para almacenar las órdenes "activas"
+  activeOrders: [],
 };
 
+/* ────────────────────────── Slice ──────────────────────────────── */
 const orderSlice = createSlice({
   name: 'order',
   initialState,
   reducers: {
-    setCurrentOrder: (state, action) => {
-      state.currentOrder = {
-        ...state.currentOrder,
-        ...action.payload,
-      };
+    /* -------- Current order -------- */
+    setCurrentOrder: (state, { payload }) => {
+      state.currentOrder = { ...state.currentOrder, ...payload };
     },
-    setOrderItems: (state, action) => {
-      state.currentOrder.items = action.payload;
+    setOrderItems: (state, { payload }) => {
+      state.currentOrder.items = payload;
     },
     clearCurrentOrder: (state) => {
       state.currentOrder = initialState.currentOrder;
     },
-    addCurrentOrderToHistoricOrders: (state, action) => {
-      const { order, items } = action.payload;
-      state.historicOrders.push({
-        ...order,
-        items: items || [],
-        status: 'pendiente',
-      });
-      state.currentOrder = initialState.currentOrder;
-    },
 
-    // NUEVA FUNCIÓN
-    addCurrentOrderToActiveOrders: (state, action) => {
-      const { order, items } = action.payload;
-      // Puedes ajustar el status si lo deseas, por ejemplo 'pending' u otro.
-      state.activeOrders.push({
-        ...order,
-        items: items || [],
-        status: 'pendiente',
-      });
-      state.currentOrder = initialState.currentOrder;
-    },
+    /* -------- Añadir a activos e históricos -------- */
+    addCurrentOrderToActiveOrders: (state, { payload }) => {
+      const { order, items } = payload;
+      const entry = { ...order, items: items || [], status: 'pendiente' };
 
-    removeHistoricOrder: (state, action) => {
-      state.historicOrders = state.historicOrders.filter(
-        (o) => o.id !== action.payload
-      );
-    },
-    setHistoricOrders: (state, action) => {
-      state.historicOrders = action.payload;
-    },
-    addHistoricOrder: (state, action) => {
-      state.historicOrders.push(action.payload);
-    },
-    updateOrderState: (state, action) => {
-      const { orderId, newStatus } = action.payload;
-      console.log(`in action updatestate id :${orderId}, status: ${newStatus}`);
-      const order = state.historicOrders.find((o) => o.id === orderId);
-      if (order) {
-        order.status = newStatus;
+      /* push si no estaban */
+      if (!state.activeOrders.find((o) => o.id === entry.id)) {
+        state.activeOrders.push(entry);
       }
+      if (!state.historicOrders.find((o) => o.id === entry.id)) {
+        state.historicOrders.push(entry);
+      }
+
+  
+      state.currentOrder = { ...entry };
+      console.log(state.currentOrder,"state.currentOrder")
+    },
+
+    /* -------- Históricas desde backend -------- */
+    addHistoricOrder: (state, { payload }) => {
+      const existing = state.historicOrders.find((o) => o.id === payload.id);
+      if (existing) {
+        Object.assign(existing, payload); // completa / actualiza
+      } else {
+        state.historicOrders.push(payload);
+      }
+    },
+    setHistoricOrders: (state, { payload }) => {
+      state.historicOrders = payload;
+    },
+
+    /* -------- Actualizar estado global -------- */
+    updateOrderState: (state, { payload }) => {
+      const { orderId, newStatus } = payload;
+
+      const apply = (arr) => {
+        const o = arr.find((x) => x.id === orderId);
+        if (o) o.status = newStatus;
+      };
+      apply(state.historicOrders);
+      apply(state.activeOrders);
+
       if (state.currentOrder.id === orderId) {
         state.currentOrder.status = newStatus;
       }
     },
-    setCurrentOrderById: (state, action) => {
-      const orderId = action.payload;
-      const order = state.historicOrders.find((o) => o.id === orderId);
-      if (order) {
-        state.currentOrder = { ...order };
-      }
+
+    /* -------- Utilidades -------- */
+    removeHistoricOrder: (state, { payload }) => {
+      state.historicOrders = state.historicOrders.filter((o) => o.id !== payload);
+    },
+    setCurrentOrderById: (state, { payload }) => {
+      const found = state.historicOrders.find((o) => o.id === payload);
+      if (found) state.currentOrder = { ...found };
     },
   },
 });
@@ -90,15 +98,12 @@ export const {
   setCurrentOrder,
   setOrderItems,
   clearCurrentOrder,
-  addCurrentOrderToHistoricOrders,
-  removeHistoricOrder,
-  setHistoricOrders,
+  addCurrentOrderToActiveOrders,
   addHistoricOrder,
   updateOrderState,
+  removeHistoricOrder,
+  setHistoricOrders,
   setCurrentOrderById,
-
-  // Asegúrate de exportar la nueva acción
-  addCurrentOrderToActiveOrders,
 } = orderSlice.actions;
 
 export default orderSlice.reducer;

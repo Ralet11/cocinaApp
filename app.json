@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "premier burguer",
-    "slug": "premier-burguer",
+    "slug": "premierburguer",
     "version": "1.0.0",
     "scheme": "premierburguer",
     "orientation": "portrait",
@@ -33,7 +33,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "64dd5ca7-d521-4258-8768-58865d1c00d7"
+        "projectId": "7d989cdf-ebc0-4083-a3aa-4cc3ffc4e3bc"
       }
     }
   }

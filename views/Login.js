@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+// src/screens/Login.js
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,33 +10,37 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  ScrollView,
   StatusBar,
-  Dimensions,
+  Image,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'react-native-axios';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { setUser } from '../redux/slices/user.slice';
 import Toast from 'react-native-toast-message';
 import { API_URL } from '@env';
+import { useTranslation } from 'react-i18next';
 
-const { width } = Dimensions.get('window');
+// Importa el logo como módulo
+import logo from '../assets/premierburguer.png';
 
 const Login = ({ navigation }) => {
-  const [email, setEmail] = useState('ramiro.alet@hotmail.com');
-  const [password, setPassword] = useState('123456');
-  const [emailError, setEmailError] = useState(false);
+  const dispatch    = useDispatch();
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector(s => s.user.language);
+
+  useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
+
+  const [email, setEmail]                 = useState('ramiro.alet@hotmail.com');
+  const [password, setPassword]           = useState('123456');
+  const [emailError, setEmailError]       = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading]         = useState(false);
 
-  const dispatch = useDispatch();
-
-  const isValidEmail = (value) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value);
-  };
+  const isValidEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
   const handleSignIn = async () => {
     setEmailError(false);
@@ -44,8 +50,8 @@ const Login = ({ navigation }) => {
       setEmailError(true);
       Toast.show({
         type: 'error',
-        text1: 'Invalid Email',
-        text2: 'Please enter a valid email address.',
+        text1: t('login.error.invalidEmailTitle'),
+        text2: t('login.error.invalidEmailMessage'),
       });
       return;
     }
@@ -54,35 +60,34 @@ const Login = ({ navigation }) => {
       setPasswordError(true);
       Toast.show({
         type: 'error',
-        text1: 'Invalid Password',
-        text2: 'Please check your password and try again.',
+        text1: t('login.error.invalidPasswordTitle'),
+        text2: t('login.error.invalidPasswordMessage'),
       });
       return;
     }
 
-    const data = { email, password };
     setIsLoading(true);
-
     try {
-      const response = await axios.post(`${API_URL}/user/login`, data);
-
-      if (response.status === 200) {
-        const { user, token } = response.data;
+      const res = await axios.post(`${API_URL}/user/login`, { email, password });
+      if (res.status === 200) {
+        const { user, token } = res.data;
         dispatch(setUser({ ...user, token }));
         navigation.navigate('HomeTabs');
       } else {
         Toast.show({
           type: 'error',
-          text1: 'Login Error',
-          text2: 'Invalid credentials. Please try again.',
+          text1: t('login.error.loginFailedTitle'),
+          text2: t('login.error.loginFailedMessage'),
         });
       }
-    } catch (error) {
-      console.error('Error during login:', error);
+    } catch (err) {
+      console.error(err);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.error || 'Authentication failed.',
+        text1: t('login.error.serverErrorTitle'),
+        text2: err.response?.data?.error
+          ? err.response.data.error
+          : t('login.error.serverErrorMessage'),
       });
     } finally {
       setIsLoading(false);
@@ -94,28 +99,28 @@ const Login = ({ navigation }) => {
       setEmailError(true);
       Toast.show({
         type: 'error',
-        text1: 'Invalid Email',
-        text2: 'Please enter a valid email address.',
+        text1: t('login.error.invalidEmailTitle'),
+        text2: t('login.error.invalidEmailMessage'),
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/user/forgot-password`, { email });
-      if (response.status === 200) {
+      const res = await axios.post(`${API_URL}/user/forgot-password`, { email });
+      if (res.status === 200) {
         Toast.show({
           type: 'success',
-          text1: 'Password Recovery',
-          text2: response.data.message || 'Recovery email sent.',
+          text1: t('login.success.resetTitle'),
+          text2: res.data.message || t('login.success.resetMessage'),
         });
       }
-    } catch (error) {
-      console.error('Error during password reset request:', error);
+    } catch (err) {
+      console.error(err);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.message || 'Failed to send email.',
+        text1: t('login.error.serverErrorTitle'),
+        text2: err.response?.data?.message || t('login.error.serverErrorMessage'),
       });
     } finally {
       setIsLoading(false);
@@ -129,142 +134,158 @@ const Login = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Icon name="hamburger" size={50} color="#FFFFFF" />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* HEADER */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              {/* Usa el logo importado */}
+              <Image source={logo} style={styles.logoImage} />
+            </View>
+            <Text style={styles.title}>Burguer</Text>
+            <Text style={styles.subtitle}>El sabor que te hace regresar</Text>
           </View>
-          <Text style={styles.title}>Premier Burguer</Text>
-          <Text style={styles.subtitle}>
-            {showForgotPassword
-              ? 'Recover your password'
-              : 'The flavor that keeps you coming back'}
-          </Text>
-        </View>
 
-        <View style={styles.card}>
-          {!showForgotPassword ? (
-            <>
-              <Text style={styles.cardTitle}>Sign In</Text>
-              
-              <View style={styles.inputWrapper}>
-                <View style={[styles.inputContainer, emailError && styles.inputContainerError]}>
-                  <Icon name="email-outline" size={20} color="#777777" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#9CA3AF"
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      setEmailError(false);
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
+          {/* CARD */}
+          <View style={styles.card}>
+            {!showForgotPassword ? (
+              <>
+                <Text style={styles.cardTitle}>{t('login.cardTitle.signIn')}</Text>
+
+                {/* Email */}
+                <View style={styles.inputWrapper}>
+                  <View style={[styles.inputContainer, emailError && styles.inputError]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('login.emailPlaceholder')}
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={text => {
+                        setEmail(text);
+                        setEmailError(false);
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  {emailError && (
+                    <Text style={styles.errorText}>
+                      {t('login.error.invalidEmailMessage')}
+                    </Text>
+                  )}
                 </View>
-                {emailError && <Text style={styles.errorText}>Invalid email</Text>}
-              </View>
 
-              <View style={styles.inputWrapper}>
-                <View style={[styles.inputContainer, passwordError && styles.inputContainerError]}>
-                  <Icon name="lock-outline" size={20} color="#777777" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor="#9CA3AF"
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      setPasswordError(false);
-                    }}
-                    secureTextEntry
-                  />
+                {/* Password */}
+                <View style={styles.inputWrapper}>
+                  <View style={[styles.inputContainer, passwordError && styles.inputError]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('login.passwordPlaceholder')}
+                      placeholderTextColor="#9CA3AF"
+                      value={password}
+                      onChangeText={text => {
+                        setPassword(text);
+                        setPasswordError(false);
+                      }}
+                      secureTextEntry
+                    />
+                  </View>
+                  {passwordError && (
+                    <Text style={styles.errorText}>
+                      {t('login.error.invalidPasswordMessage')}
+                    </Text>
+                  )}
                 </View>
-                {passwordError && <Text style={styles.errorText}>Password required</Text>}
-              </View>
 
-              <TouchableOpacity
-                style={styles.forgotPassword}
-                onPress={() => setShowForgotPassword(true)}
-              >
-                <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.forgotPassword}
+                  onPress={() => setShowForgotPassword(true)}
+                >
+                  <Text style={styles.forgotPasswordText}>
+                    {t('login.forgotPasswordText')}
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.button, isLoading && styles.buttonDisabled]} 
-                onPress={handleSignIn}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Text style={styles.buttonText}>Loading...</Text>
-                ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleSignIn}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.buttonText}>
+                    {isLoading
+                      ? t('login.button.loading')
+                      : t('login.button.signIn')}
+                  </Text>
+                </TouchableOpacity>
 
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.signupLink}
-                onPress={() => navigation.navigate('Signup')}
-              >
-                <Text style={styles.signupText}>
-                  Don't have an account? <Text style={styles.signupTextBold}>Sign Up</Text>
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.cardTitle}>Recover Password</Text>
-              <Text style={styles.resetInfo}>
-                Enter your email to receive a recovery link.
-              </Text>
-              
-              <View style={styles.inputWrapper}>
-                <View style={[styles.inputContainer, emailError && styles.inputContainerError]}>
-                  <Icon name="email-outline" size={20} color="#777777" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#9CA3AF"
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      setEmailError(false);
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>{t('login.dividerOr')}</Text>
+                  <View style={styles.dividerLine} />
                 </View>
-                {emailError && <Text style={styles.errorText}>Invalid email</Text>}
-              </View>
 
-              <TouchableOpacity 
-                style={[styles.button, isLoading && styles.buttonDisabled, { marginTop: 20 }]} 
-                onPress={handleForgotPasswordRequest}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Text style={styles.buttonText}>Sending...</Text>
-                ) : (
-                  <Text style={styles.buttonText}>Send Link</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.signupLink}
+                  onPress={() => navigation.navigate('Signup')}
+                >
+                  <Text style={styles.signupText}>
+                    {t('login.noAccountText')}{' '}
+                    <Text style={styles.signupTextBold}>
+                      {t('login.signUpText')}
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.cardTitle}>{t('login.cardTitle.reset')}</Text>
+                <Text style={styles.resetInfo}>{t('login.resetInfo')}</Text>
 
-              <TouchableOpacity 
-                style={styles.backToLogin} 
-                onPress={() => setShowForgotPassword(false)}
-              >
-                <Icon name="arrow-left" size={16} color="#D32F2F" style={{ marginRight: 5 }} />
-                <Text style={styles.backToLoginText}>Back to Sign In</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+                <View style={styles.inputWrapper}>
+                  <View style={[styles.inputContainer, emailError && styles.inputError]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('login.emailPlaceholder')}
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={text => {
+                        setEmail(text);
+                        setEmailError(false);
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  {emailError && (
+                    <Text style={styles.errorText}>
+                      {t('login.error.invalidEmailMessage')}
+                    </Text>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonForgot, isLoading && styles.buttonDisabled]}
+                  onPress={handleForgotPasswordRequest}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.buttonText}>
+                    {isLoading
+                      ? t('login.button.resetLoading')
+                      : t('login.button.reset')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.backToLogin}
+                  onPress={() => setShowForgotPassword(false)}
+                >
+                  <Text style={styles.backToLoginText}>
+                    ← {t('login.backToLogin')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
       <Toast />
     </SafeAreaView>
@@ -272,66 +293,33 @@ const Login = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logoContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#D32F2F',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 6,
-  },
-  title: {
-    fontSize: 28,
-    color: '#D32F2F',
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  card: {
+  container:        { flex: 1, backgroundColor: '#FFFFFF' },
+  content:          { flex: 1 },
+  scrollContent:    { flexGrow: 1, justifyContent: 'center', padding: 20 },
+
+  header:           { alignItems: 'center', marginBottom: 30 },
+  logoContainer:    { marginBottom: 0, alignItems: 'center' },
+  logoImage:        { width: 300, height: 150, resizeMode: 'contain' },  // ← Aumentado
+
+  title:            { fontSize: 28, color: '#D32F2F', fontWeight: 'bold', marginBottom: 4 },
+  subtitle:         { fontSize: 16, color: '#6B7280', textAlign: 'center' },
+
+  card:             {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 5,
-    marginHorizontal: 5,
   },
-  cardTitle: {
+  cardTitle:        {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#000',
     marginBottom: 20,
     textAlign: 'center',
   },
-  inputWrapper: {
-    marginBottom: 16,
-  },
-  inputContainer: {
+
+  inputWrapper:     { marginBottom: 16 },
+  inputContainer:   {
     flexDirection: 'row',
     alignItems: 'center',
     height: 55,
@@ -341,99 +329,35 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     paddingHorizontal: 12,
   },
-  inputContainerError: {
-    borderColor: '#D32F2F',
-    borderWidth: 1,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  errorText: {
-    color: '#D32F2F',
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-    marginTop: 4,
-  },
-  forgotPasswordText: {
-    color: '#D32F2F',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  button: {
+  inputError:       { borderColor: '#D32F2F' },
+  input:            { flex: 1, fontSize: 16, color: '#1F2937' },
+
+  errorText:        { color: '#D32F2F', fontSize: 12, marginTop: 4, marginLeft: 4 },
+  forgotPassword:   { alignSelf: 'flex-end', marginBottom: 24, marginTop: 4 },
+  forgotPasswordText:{ color: '#D32F2F', fontSize: 14, fontWeight: '500' },
+
+  button:           {
     height: 55,
     borderRadius: 12,
     backgroundColor: '#D32F2F',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#D32F2F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
     elevation: 5,
   },
-  buttonDisabled: {
-    backgroundColor: '#F87171',
-    shadowOpacity: 0.1,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    color: '#6B7280',
-    paddingHorizontal: 10,
-    fontSize: 14,
-  },
-  signupLink: {
-    alignItems: 'center',
-  },
-  signupText: {
-    color: '#6B7280',
-    fontSize: 15,
-  },
-  signupTextBold: {
-    color: '#D32F2F',
-    fontWeight: 'bold',
-  },
-  resetInfo: {
-    color: '#4B5563',
-    fontSize: 14,
-    marginBottom: 20,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  backToLogin: {
-    marginTop: 20,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  backToLoginText: {
-    color: '#D32F2F',
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  buttonForgot:     { marginTop: 20 },
+  buttonDisabled:   { backgroundColor: '#F87171' },
+  buttonText:       { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+
+  divider:          { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  dividerLine:      { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+  dividerText:      { color: '#6B7280', paddingHorizontal: 10, fontSize: 14 },
+
+  signupLink:       { alignItems: 'center' },
+  signupText:       { color: '#6B7280', fontSize: 15 },
+  signupTextBold:   { color: '#D32F2F', fontWeight: 'bold' },
+
+  backToLogin:      { marginTop: 20, alignItems: 'center' },
+  backToLoginText:  { color: '#D32F2F', fontSize: 14, fontWeight: '500' },
 });
 
 export default Login;

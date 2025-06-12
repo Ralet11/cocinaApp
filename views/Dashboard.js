@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from 'react';
+// frontend/src/views/Dashboard.jsx
+"use client"
+
+import { useEffect, useState, useRef, useMemo } from "react"
 import {
   View,
   Text,
@@ -10,220 +13,247 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
-import { useSelector, useDispatch } from 'react-redux';
-import axios from 'react-native-axios';
+  FlatList,
+} from "react-native"
+import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import { useNavigation } from "@react-navigation/native"
+import { useSelector, useDispatch } from "react-redux"
+import axios from "react-native-axios"
+import { useTranslation } from "react-i18next"           // ← importamos hook
 
-// Acciones de Redux
-import { setAddresses, setCurrentAddress } from "../redux/slices/user.slice";
-import { setPartnerId } from '../redux/slices/partner.slice';
-import { setHistoricOrders } from '../redux/slices/order.slice';
-import useSocket from '../config/socket';
-import { API_URL } from "@env";
+// ── Redux actions ───────────────────────────────────────────────────────────
+import { setAddresses, setCurrentAddress } from "../redux/slices/user.slice"
+import { setPartnerId }                     from "../redux/slices/partner.slice"
+import { setHistoricOrders }                from "../redux/slices/order.slice"
+import { addItem, removeItem, updateItemQuantity } from "../redux/slices/cart.slice"
+import { API_URL }                          from "@env"
 
-const { width } = Dimensions.get('window');
-const cardWidth = width * 0.7;
+const { width }   = Dimensions.get("window")
+const cardWidth   = width * 0.85  // Tarjetas más anchas
 
-const Dashboard = () => {
-  const navigation = useNavigation();
-  const dispatch = useDispatch();
+export default function Dashboard() {
+  const navigation     = useNavigation()
+  const dispatch       = useDispatch()
+  const { t, i18n }    = useTranslation()               // ← destructuramos t() e i18n
 
-  // -- Estados locales --
-  const [groupedProducts, setGroupedProducts] = useState({});
-  const [partner, setPartner] = useState(null);
+  // ── Redux selectors ───────────────────────────────────────────────────────
+  const cart           = useSelector(s => s.cart.items)
+  const token          = useSelector(s => s.user.userInfo.token)
+  const user_id        = useSelector(s => s.user.userInfo?.id)
+  const addresses      = useSelector(s => s.user.addresses)
+  const currentAddress = useSelector(s => s.user.currentAddress)
+  const currentLang    = useSelector(s => s.user.language)
 
-  // Control de carga general de la pantalla (partner, productos, etc.)
-  const [isScreenLoading, setIsScreenLoading] = useState(true);
-  // Control de carga específico para "addresses"
-  const [isFetchingAddresses, setIsFetchingAddresses] = useState(false);
-
-  // -- Redux: carrito, órdenes históricas, token, user_id
-  const cart = useSelector((state) => state.cart.items);
-  const historicOrders = useSelector((state) => state.order.historicOrders);
-  const token = useSelector((state) => state.user?.userInfo?.token);
-  const user_id = useSelector((state) => state.user?.userInfo?.id);
-  console.log(historicOrders, "order11s")
-  // -- Redux: direcciones --
-  const addresses = useSelector((state) => state.user?.addresses);
-  const currentAddress = useSelector((state) => state.user?.currentAddress);
-
-  // 1) Al montar: cargar direcciones si es necesario
+  // ── Cuando cambie el idioma en Redux, actualizamos i18n ───────────────────
   useEffect(() => {
+    if (currentLang) {
+      i18n.changeLanguage(currentLang)
+    }
+  }, [currentLang])
+
+  // ── Local state ───────────────────────────────────────────────────────────
+  const [groupedProducts, setGroupedProducts]   = useState({})
+  const [activeCategory, setActiveCategory]     = useState("")
+  const [searchTerm, setSearchTerm]             = useState("")
+  const [isScreenLoading, setIsScreenLoading]         = useState(true)
+  const [isFetchingAddresses, setIsFetchingAddresses] = useState(false)
+
+  // Scroll refs
+  const scrollViewRef   = useRef(null)
+  const categoryRefs    = useRef({})
+  const categoryListRef = useRef(null)
+
+  // ── 1) Cargar direcciones ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!token || !user_id) return
+
     const getAddresses = async () => {
-      // Si ya tenemos addresses, no las volvemos a pedir
-      if (addresses && addresses.length > 0) {
-        // Aseguramos que haya currentAddress
-        if (!currentAddress) {
-          dispatch(setCurrentAddress(addresses[0]));
-        }
-        return; // nos salimos
-      }
-
-      // Si NO hay direcciones, las pedimos
-      setIsFetchingAddresses(true);
+      setIsFetchingAddresses(true)
       try {
-        const response = await axios.get(`${API_URL}/user/getAllAddress/${user_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.data.length === 0) {
-          // Si definitivamente no hay direcciones => navigate
-          navigation.navigate('FirstAddressScreen');
+        const { data } = await axios.get(
+          `${API_URL}/user/getAllAddress/${user_id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!data.length) {
+          navigation.navigate("FirstAddressScreen")
         } else {
-          // Guardamos en Redux
-          dispatch(setAddresses(response.data));
-
-          // Si no hay currentAddress, definimos la primera
-          if (!currentAddress) {
-            dispatch(setCurrentAddress(response.data[0]));
-          }
+          dispatch(setAddresses(data))
+          if (!currentAddress) dispatch(setCurrentAddress(data[0]))
         }
-      } catch (error) {
-        console.error('Error fetching addresses:', error);
+      } catch (err) {
+        console.error("Error fetching addresses:", err.response || err)
       } finally {
-        setIsFetchingAddresses(false);
+        setIsFetchingAddresses(false)
       }
-    };
+    }
 
-    getAddresses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (addresses?.length) {
+      if (!currentAddress) dispatch(setCurrentAddress(addresses[0]))
+      setIsFetchingAddresses(false)
+    } else {
+      getAddresses()
+    }
+  }, [token, user_id])
 
-  // 2) Cargar órdenes históricas (solo una vez)
+  // ── 2) Cargar órdenes históricas ──────────────────────────────────────────
   useEffect(() => {
-    const fetchHistoricOrders = async () => {
+    if (!token || !user_id) return
+    const fetchHistoric = async () => {
       try {
-        const response = await axios.get(`${API_URL}/order/getAllByUser/${user_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        dispatch(setHistoricOrders(response.data));
-      } catch (error) {
-        console.error('Error fetching historic orders:', error);
+        const { data } = await axios.get(
+          `${API_URL}/order/getAllByUser/${user_id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        dispatch(setHistoricOrders(data))
+      } catch (err) {
+        console.error("Error fetching historic orders:", err.response || err)
       }
-    };
-    fetchHistoricOrders();
-  }, [user_id, token, dispatch]);
+    }
+    fetchHistoric()
+  }, [token, user_id])
 
-  // 3) Cada vez que tengamos (o cambie) currentAddress, pedimos el Partner más cercano
-  //    y los productos. Hasta entonces, la pantalla estará "cargando".
+  // ── 3) Partner + productos cuando cambia dirección ─────────────────────────
   useEffect(() => {
-    const getClosestPartnerAndProducts = async () => {
-      if (!currentAddress || isFetchingAddresses) return;
-  
-      setIsScreenLoading(true);
+    if (!token || !currentAddress || isFetchingAddresses) return
+
+    const fetchPartnerAndProducts = async () => {
+      setIsScreenLoading(true)
       try {
-        // 1) Partner más cercano
-        const resp = await axios.post(
+        const p = await axios.post(
           `${API_URL}/partner/closest`,
-          {
-            address: {
-              latitude: currentAddress.lat,
-              longitude: currentAddress.lng,
-            },
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        const closestPartner = resp.data.closestPartner;
-        console.log(closestPartner, "closr")
-        setPartner(closestPartner);
-        dispatch(setPartnerId(closestPartner.id));
-  
-        // 2) Productos agrupados por categoría
-        const productsResp = await axios.get(
-          `${API_URL}/partner/${closestPartner.id}/products`,
-          {
-            headers: { Authorization: `Bearer ${token}` }, // Token incluido aquí
-          }
-        );
+          { address: { latitude: currentAddress.lat, longitude: currentAddress.lng } },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const partner = p.data.closestPartner
+        dispatch(setPartnerId(partner.id))
 
-        console.log(productsResp.data, "prodresp")
-        setGroupedProducts(productsResp.data.cat || {});
-      } catch (error) {
-        console.error('Error fetching partner/products:', error);
-      } finally {
-        setIsScreenLoading(false);
-      }
-    };
-  
-    getClosestPartnerAndProducts();
-  }, [currentAddress, isFetchingAddresses, dispatch]);
-  
-  // 4) Cuando la pantalla reciba "focus", si hay que refrescar direcciones, lo hacemos
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', async () => {
-      const refresh = navigation.getParam?.('refresh', false);
-      if (refresh) {
-        setIsFetchingAddresses(true);
-        try {
-          const response = await axios.get(`${API_URL}/user/getAllAddress/${user_id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (response.data.length === 0) {
-            navigation.navigate('FirstAddressScreen');
-          } else {
-            dispatch(setAddresses(response.data));
-            if (!currentAddress) {
-              dispatch(setCurrentAddress(response.data[0]));
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching addresses on focus:', error);
-        } finally {
-          setIsFetchingAddresses(false);
+        const prod = await axios.get(
+          `${API_URL}/partner/${partner.id}/products`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const grouped = prod.data.cat || {}
+        setGroupedProducts(grouped)
+        if (Object.keys(grouped).length) {
+          setActiveCategory(Object.keys(grouped)[0])
         }
+      } catch (err) {
+        console.error("Error fetching partner/products:", err.response || err)
+      } finally {
+        setIsScreenLoading(false)
       }
-    });
-    return unsubscribe;
-  }, [navigation, user_id, token, dispatch, currentAddress]);
+    }
 
+    fetchPartnerAndProducts()
+  }, [token, currentAddress, isFetchingAddresses])
 
+  // ── 4) Filtrado por searchTerm ─────────────────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return groupedProducts
+    const term = searchTerm.trim().toLowerCase()
+    const res = {}
+    Object.entries(groupedProducts).forEach(([cat, products]) => {
+      const matches = products.filter(p =>
+        p.name.toLowerCase().includes(term)
+      )
+      if (matches.length) res[cat] = matches
+    })
+    return res
+  }, [searchTerm, groupedProducts])
 
-  // 5) Render de carga general, si es que todavía estamos trayendo partner/productos
-  //    o si estamos pidiendo direcciones. (Opcional: puedes refinar la lógica)
+  useEffect(() => {
+    if (!filteredProducts[activeCategory]) {
+      setActiveCategory(Object.keys(filteredProducts)[0] || "")
+    }
+  }, [filteredProducts])
+
+  // ── Scroll a categoría ─────────────────────────────────────────────────────
+  const scrollToCategory = (cat) => {
+    setActiveCategory(cat)
+    const idx = Object.keys(filteredProducts).indexOf(cat)
+    if (idx !== -1) {
+      categoryListRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewPosition: 0.5,
+      })
+    }
+    categoryRefs.current[cat]?.measureLayout(
+      scrollViewRef.current,
+      (_x, y) => scrollViewRef.current.scrollTo({ y, animated: true }),
+      () => {}
+    )
+  }
+
+  // ── Helpers de carrito ─────────────────────────────────────────────────────
+  const handleAddPress = (item, isHamburger) => {
+    if (isHamburger) {
+      navigation.getParent().navigate("ProductDetail", { product: item, isHamburger: true })
+    } else {
+      const existing = cart.find(i => i.productId === item.id)
+      if (existing) {
+        dispatch(updateItemQuantity({ id: existing.id, quantity: existing.quantity + 1 }))
+      } else {
+        dispatch(addItem({
+          id: item.id,
+          productId: item.id,
+          name: item.name,
+          quantity: 1,
+          pricePerUnit: parseFloat(item.price),
+          totalPrice: parseFloat(item.price),
+          image: item.img,
+        }))
+      }
+    }
+  }
+
+  const handleRemovePress = (item) => {
+    const existing = cart.find(i => i.productId === item.id)
+    if (!existing) return
+    if (existing.quantity > 1) {
+      dispatch(updateItemQuantity({ id: existing.id, quantity: existing.quantity - 1 }))
+    } else {
+      dispatch(removeItem(existing.id))
+    }
+  }
+
+  const getQuantity = (productId) => {
+    const i = cart.find(x => x.productId === productId)
+    return i ? i.quantity : 0
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   if (isScreenLoading) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#D32F2F" />
-        <Text style={styles.loaderText}>Cargando datos...</Text>
+        <Text style={styles.loaderText}>{t("dashboard.loading")}</Text>
       </SafeAreaView>
-    );
+    )
   }
 
-  // --- Render principal ---
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Icon name="map-marker" size={24} color="#FFFFFF" />
+        <Icon name="map-marker" size={24} color="#FFF"/>
         <TouchableOpacity
           onPress={() => navigation.navigate("Addresses")}
           style={styles.addressContainer}
         >
           <View style={styles.streetLine}>
-            <Text
-              style={styles.locationText}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {currentAddress?.street || 'Seleccionar dirección'}
+            <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+              {currentAddress?.street || t("dashboard.selectAddress")}
             </Text>
-            <Icon name="chevron-down" size={24} color="#FFFFFF" />
+            <Icon name="chevron-down" size={24} color="#FFF"/>
           </View>
-          <Text style={styles.addressType}>
-            {currentAddress?.type || ''}
-          </Text>
+          <Text style={styles.addressType}>{currentAddress?.type || ""}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.cartButton}
-          onPress={() => navigation.navigate('CartScreen')}
+          style={styles.cartIconButton}
+          onPress={() => navigation.navigate("CartScreen")}
         >
-          <Icon name="cart-outline" size={24} color="#FFFFFF" />
+          <Icon name="cart-outline" size={24} color="#FFF"/>
           {cart.length > 0 && (
             <View style={styles.badgeContainer}>
               <Text style={styles.badgeText}>{cart.length}</Text>
@@ -232,217 +262,248 @@ const Dashboard = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Contenido principal */}
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
-        {/* Barra de búsqueda */}
-        <View style={styles.searchContainer}>
-          <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar comida o restaurante"
-            placeholderTextColor="#9CA3AF"
+      {/* Mostrar idioma actual */}
+      
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon}/>
+        <TextInput
+          style={styles.searchInput}
+          placeholder={t("dashboard.searchPlaceholder")}
+          placeholderTextColor="#9CA3AF"
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          returnKeyType="search"
+        />
+      </View>
+
+      {/* Categories */}
+      {!!Object.keys(filteredProducts).length && (
+        <View style={styles.categoriesContainer}>
+          <FlatList
+            ref={categoryListRef}
+            data={Object.keys(filteredProducts)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={item => item}
+            contentContainerStyle={styles.categoriesList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.categoryButton,
+                  activeCategory === item && styles.activeCategoryButton,
+                ]}
+                onPress={() => scrollToCategory(item)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    activeCategory === item && styles.activeCategoryButtonText,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            )}
+            onScrollToIndexFailed={info =>
+              setTimeout(
+                () => categoryListRef.current?.scrollToIndex({ index: info.index }),
+                500
+              )
+            }
           />
-          <TouchableOpacity style={styles.filterButton}>
-            <Icon name="tune-vertical" size={24} color="#D32F2F" />
-          </TouchableOpacity>
         </View>
+      )}
 
-        {/* Listado de categorías y productos */}
-        {Object.keys(groupedProducts).map((categoryName) => (
-  <View key={categoryName} style={styles.sectionContainer}>
-    <Text style={styles.sectionTitle}>{categoryName}</Text>
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.featuredScroll}
-    >
-      {groupedProducts[categoryName].map((item) => (
-        <TouchableOpacity
-          key={item.id}
-          style={styles.gridItem}
-          onPress={() =>
-            navigation
-              .getParent()
-              .navigate('ProductDetail', {
-                product: item,
-                isHamburger: categoryName === 'Burgers', // <-- Pass true only for Burgers
-              })
-          }
-        >
-          {/* Image */}
-          <Image source={{ uri: item.img }} style={styles.itemImage} />
-
-          {/* Dark overlay (optional) */}
-          <View style={styles.itemOverlay} />
-
-          {/* Product info (name & price) */}
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemPrice}>${item.price}</Text>
+      {/* Products */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.productsContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {Object.entries(filteredProducts).map(([categoryName, products]) => {
+          const isHamburger = categoryName === "Burgers"
+          return (
+            <View
+              key={categoryName}
+              style={styles.sectionContainer}
+              ref={el => (categoryRefs.current[categoryName] = el)}
+            >
+              <Text style={styles.sectionTitle}>{categoryName}</Text>
+              <View style={styles.productsGrid}>
+                {products.map(item => {
+                  const qty = getQuantity(item.id)
+                  return (
+                    <View key={item.id} style={styles.productCard}>
+                      <TouchableOpacity
+                        style={styles.productImageContainer}
+                        onPress={() =>
+                          navigation
+                            .getParent()
+                            .navigate("ProductDetail", { product: item, isHamburger })
+                        }
+                      >
+                        <Image source={{ uri: item.img }} style={styles.productImage}/>
+                      </TouchableOpacity>
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.productPrice}>${item.price}</Text>
+                        <View style={styles.cartControls}>
+                          {qty > 0 ? (
+                            <>
+                              <TouchableOpacity
+                                style={styles.cartQuantityButton}
+                                onPress={() => handleRemovePress(item)}
+                              >
+                                <Icon name="minus" size={16} color="#FFF"/>
+                              </TouchableOpacity>
+                              <Text style={styles.quantityText}>{qty}</Text>
+                              <TouchableOpacity
+                                style={styles.cartQuantityButton}
+                                onPress={() => handleAddPress(item, isHamburger)}
+                              >
+                                <Icon name="plus" size={16} color="#FFF"/>
+                              </TouchableOpacity>
+                            </>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.addToCartButton}
+                              onPress={() => handleAddPress(item, isHamburger)}
+                            >
+                              <Icon name="plus" size={16} color="#FFF"/>
+                              <Text style={styles.addToCartText}>
+                                {t("dashboard.addToCart")}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
+            </View>
+          )
+        })}
+        {!Object.keys(filteredProducts).length && (
+          <View style={styles.noResultsContainer}>
+            <Icon name="emoticon-sad-outline" size={64} color="#D32F2F"/>
+            <Text style={styles.noResultsText}>
+              {t("dashboard.noProducts")}
+            </Text>
           </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </View>
-))}
+        )}
+        <View style={{ height: 20 }}/>
       </ScrollView>
     </SafeAreaView>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  loaderText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#D32F2F',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#D32F2F',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  addressContainer: {
-    flex: 1,
-    marginLeft: 8,
-    marginRight: 8,
-    maxWidth: '70%',
-  },
-  streetLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  addressType: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    marginTop: 2,
-  },
-  cartButton: {
-    position: 'relative',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: 'black',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-    paddingTop: 20,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: 36,
-    zIndex: 1,
-  },
-  searchInput: {
-    flex: 1,
-    height: 50,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    paddingLeft: 48,
-    paddingRight: 16,
-    fontSize: 16,
-    color: '#4B5563',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  filterButton: {
-    marginLeft: 12,
-    padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 16,
-  },
-  featuredScroll: {},
-  gridItem: {
-    width: cardWidth,
-    height: 200,
-    marginRight: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  itemOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  itemInfo: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-});
-
-export default Dashboard;
+  loaderContainer:     { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F5F5F5" },
+  loaderText:          { marginTop: 10, fontSize: 16, color: "#D32F2F" },
+  container:           { flex: 1, backgroundColor: "#F5F5F5" },
+  header:              {
+                         flexDirection: "row",
+                         alignItems: "center",
+                         justifyContent: "space-between",
+                         paddingHorizontal: 20,
+                         paddingVertical: 16,
+                         backgroundColor: "#D32F2F",
+                         borderBottomLeftRadius: 24,
+                         borderBottomRightRadius: 24,
+                       },
+  addressContainer:    { flex: 1, marginHorizontal: 8, maxWidth: "70%" },
+  streetLine:          { flexDirection: "row", alignItems: "center" },
+  locationText:        { flex: 1, fontSize: 16, fontWeight: "600", color: "#FFF" },
+  addressType:         { fontSize: 12, color: "#FFF", marginTop: 2 },
+  cartIconButton:      {
+                         position: "relative",
+                         width: 32,
+                         height: 32,
+                         borderRadius: 16,
+                         backgroundColor: "#D32F2F",
+                         justifyContent: "center",
+                         alignItems: "center",
+                       },
+  badgeContainer:      {
+                         position: "absolute",
+                         top: -5,
+                         right: -5,
+                         backgroundColor: "#000",
+                         borderRadius: 10,
+                         width: 20,
+                         height: 20,
+                         justifyContent: "center",
+                         alignItems: "center",
+                       },
+  badgeText:           { color: "#FFF", fontSize: 12, fontWeight: "bold" },
+  languageContainer:   { padding: 12, backgroundColor: "#FFF", margin: 12, borderRadius: 8 },
+  languageText:        { fontSize: 14, fontWeight: "600", color: "#333" },
+  searchContainer:     {
+                         flexDirection: "row",
+                         alignItems: "center",
+                         paddingHorizontal: 20,
+                         marginVertical: 16,
+                       },
+  searchIcon:          { position: "absolute", left: 36, zIndex: 1 },
+  searchInput:         {
+                         flex: 1,
+                         height: 50,
+                         backgroundColor: "#FFF",
+                         borderRadius: 25,
+                         paddingLeft: 48,
+                         paddingRight: 16,
+                         fontSize: 16,
+                         color: "#4B5563",
+                         elevation: 3,
+                       },
+  categoriesContainer: { backgroundColor: "#FFF", paddingVertical: 12, marginBottom: 16, elevation: 3 },
+  categoriesList:      { paddingHorizontal: 16 },
+  categoryButton:      {
+                         paddingHorizontal: 16,
+                         paddingVertical: 8,
+                         marginRight: 8,
+                         backgroundColor: "#F3F4F6",
+                         borderRadius: 20,
+                       },
+  activeCategoryButton:{ backgroundColor: "#D32F2F" },
+  categoryButtonText:  { fontSize: 14, fontWeight: "500", color: "#4B5563" },
+  activeCategoryButtonText:{ color: "#FFF" },
+  productsContainer:   { flex: 1 },
+  sectionContainer:    { paddingHorizontal: 20, marginBottom: 24 },
+  sectionTitle:        { fontSize: 22, fontWeight: "bold", marginBottom: 16 },
+  productsGrid:        { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  productCard:         {
+                         width: "48%",
+                         backgroundColor: "#FFF",
+                         borderRadius: 16,
+                         marginBottom: 16,
+                         elevation: 3,
+                         overflow: "hidden",
+                       },
+  productImageContainer:{ width: "100%", height: 120 },
+  productImage:        { width: "100%", height: "100%", resizeMode: "cover" },
+  productInfo:         { padding: 12 },
+  productName:         { fontSize: 16, fontWeight: "bold", marginBottom: 4 },
+  productPrice:        { fontSize: 14, fontWeight: "bold", color: "#D32F2F", marginBottom: 8 },
+  cartControls:        { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  cartQuantityButton:  { backgroundColor: "#D32F2F", borderRadius: 16, padding: 6 },
+  quantityText:        { fontSize: 16, fontWeight: "bold", marginHorizontal: 12 },
+  addToCartButton:     {
+                         flexDirection: "row",
+                         alignItems: "center",
+                         justifyContent: "center",
+                         backgroundColor: "#D32F2F",
+                         borderRadius: 20,
+                         paddingVertical: 6,
+                         paddingHorizontal: 12,
+                         width: "100%",
+                       },
+  addToCartText:       { color: "#FFF", fontSize: 14, fontWeight: "bold", marginLeft: 4 },
+  noResultsContainer:  { alignItems: "center", marginTop: 60 },
+  noResultsText:       { marginTop: 12, fontSize: 16, color: "#4B5563" },
+})

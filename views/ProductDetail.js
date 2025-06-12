@@ -1,3 +1,4 @@
+// views/ProductDetail.js
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -18,138 +19,121 @@ import { addItem } from '../redux/slices/cart.slice';
 import { API_URL } from '@env';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 const { width, height } = Dimensions.get('window');
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export default function ProductDetail({ route }) {
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector(s => s.user.language);
+
+  // sincronizar idioma
+  useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
+
   const [ingredients, setIngredients] = useState([]);
   const [selectedIncluded, setSelectedIncluded] = useState([]);
   const [selectedExtras, setSelectedExtras] = useState([]);
   const [quantity, setQuantity] = useState(1);
-  const [selectedOption, setSelectedOption] = useState('Single');
+  const [selectedOption, setSelectedOption] = useState('Simple');
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
 
-  // Redux: obtener items del carrito
-  const cart = useSelector((state) => state.cart.items);
-
-  // Recibimos `product` y `isHamburger` desde los parámetros de la ruta
+  const cart = useSelector(state => state.cart.items);
   const { product, isHamburger } = route.params;
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
-  /**
-   * Se buscan los ingredientes solo si es una hamburguesa.
-   */
   const fetchIngredients = useCallback(async () => {
     try {
       if (isHamburger) {
         const response = await fetch(`${API_URL}/ingredient/getByProduct/${product.id}`);
         const data = await response.json();
         setIngredients(data);
-        setSelectedIncluded(
-          data.filter((ing) => ing.included).map((ing) => ing.id)
-        );
+        setSelectedIncluded(data.filter(ing => ing.included).map(ing => ing.id));
       }
     } catch (error) {
-      console.error('Error retrieving ingredients:', error);
+      console.error(error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load ingredients. Please try again.',
+        text1: t('productDetail.errorTitle'),
+        text2: t('productDetail.errorLoadIngredients'),
       });
     } finally {
       setIsLoading(false);
     }
-  }, [product.id, isHamburger]);
+  }, [product.id, isHamburger, t]);
 
   useEffect(() => {
     if (!isHamburger) {
       setIsLoading(false);
-      return;
+    } else {
+      fetchIngredients();
     }
-    fetchIngredients();
   }, [fetchIngredients, isHamburger]);
 
-  // Ingredientes incluidos y extras
-  const includedIngredients = ingredients.filter((ing) => ing.included);
-  const extraIngredients = ingredients.filter((ing) => !ing.included);
+  const includedIngredients = ingredients.filter(ing => ing.included);
+  const extraIngredients    = ingredients.filter(ing => !ing.included);
 
-  // Toggle de ingredientes
   const toggleIngredient = (id, isIncluded) => {
-    const setterFunction = isIncluded ? setSelectedIncluded : setSelectedExtras;
-    setterFunction((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    const setter = isIncluded ? setSelectedIncluded : setSelectedExtras;
+    setter(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
 
-  // Ajusta la cantidad (mínimo 1)
-  const adjustQuantity = (amount) => {
-    setQuantity((prev) => Math.max(1, prev + amount));
+  const adjustQuantity = amount => {
+    setQuantity(prev => Math.max(1, prev + amount));
   };
 
-  /**
-   * Calcula el precio base (y extras) para *1 unidad* (sin multiplicar por cantidad).
-   */
   const calculateBasePrice = () => {
-    const productPrice = parseFloat(product.price) || 0;
-    if (!isHamburger) return productPrice;
-
-    const base = selectedOption === 'Single'
-      ? productPrice
-      : productPrice * 1.5;
-
-    const extraPrice = selectedExtras.reduce((acc, id) => {
-      const ingredient = extraIngredients.find((ing) => ing.id === id);
-      return acc + (ingredient ? parseFloat(ingredient.price) || 0 : 0);
+    const base = parseFloat(product.price) || 0;
+    if (!isHamburger) return base;
+    const optionPrice =
+      selectedOption === 'Simple' ? base : base * 1.5;
+    const extrasPrice = selectedExtras.reduce((acc, id) => {
+      const ing = extraIngredients.find(e => e.id === id);
+      return acc + (ing ? parseFloat(ing.price) || 0 : 0);
     }, 0);
-
-    return base + extraPrice;
+    return optionPrice + extrasPrice;
   };
 
-  /**
-   * Agrega el producto al carrito.
-   */
   const handleAddToCart = () => {
-    const basePrice = calculateBasePrice();
-    const totalPrice = basePrice * quantity;
+    const base  = calculateBasePrice();
+    const total = base * quantity;
 
-    // Determinar los ingredientes eliminados
-    const removedIngredients = isHamburger
-      ? includedIngredients.filter((ing) => !selectedIncluded.includes(ing.id))
+    const removed = isHamburger
+      ? includedIngredients.filter(ing => !selectedIncluded.includes(ing.id))
+      : [];
+    const finalIncluded = isHamburger
+      ? includedIngredients.filter(ing => selectedIncluded.includes(ing.id))
+      : [];
+    const finalExtras = isHamburger
+      ? extraIngredients.filter(ing => selectedExtras.includes(ing.id))
       : [];
 
-    // Ingredientes finales seleccionados
-    const finalIncludedIngredients = isHamburger
-      ? includedIngredients.filter((ing) => selectedIncluded.includes(ing.id))
-      : [];
-    const finalExtraIngredients = isHamburger
-      ? extraIngredients.filter((ing) => selectedExtras.includes(ing.id))
-      : [];
-
-    // Crear un ID único para el carrito
     const uniqueId = [
       product.id,
       isHamburger ? selectedOption : '',
       isHamburger ? selectedIncluded.sort().join(',') : '',
       isHamburger ? selectedExtras.sort().join(',') : '',
-      removedIngredients.map((ing) => ing.id).sort().join(','),
+      removed.map(ing => ing.id).sort().join(','),
     ].join('-');
 
-    // Objeto del carrito
     const cartItem = {
       id: uniqueId,
       productId: product.id,
       name: product.name,
       option: isHamburger ? selectedOption : null,
-      includedIngredients: finalIncludedIngredients,
-      extraIngredients: finalExtraIngredients,
-      removedIngredients: removedIngredients,
+      includedIngredients: finalIncluded,
+      extraIngredients: finalExtras,
+      removedIngredients: removed,
       quantity,
-      pricePerUnit: parseFloat(basePrice.toFixed(2)),
-      totalPrice: parseFloat(totalPrice.toFixed(2)),
+      pricePerUnit: parseFloat(base.toFixed(2)),
+      totalPrice: parseFloat(total.toFixed(2)),
       image: product.img,
     };
 
@@ -157,8 +141,8 @@ export default function ProductDetail({ route }) {
 
     Toast.show({
       type: 'success',
-      text1: 'Product added',
-      text2: `${product.name} was added to the cart`,
+      text1: t('productDetail.toastAddedTitle'),
+      text2: t('productDetail.toastAddedMessage', { name: product.name }),
       position: 'bottom',
       visibilityTime: 2000,
       bottomOffset: 100,
@@ -168,14 +152,12 @@ export default function ProductDetail({ route }) {
     setTimeout(() => setIsAdding(false), 2000);
   };
 
-  // Animación para el header borroso
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  // Renderiza cada botón de ingrediente
   const renderIngredientButton = (ing, isIncluded) => (
     <TouchableOpacity
       key={ing.id}
@@ -198,9 +180,7 @@ export default function ProductDetail({ route }) {
         style={[
           styles.checkmarkContainer,
           {
-            opacity: (isIncluded ? selectedIncluded : selectedExtras).includes(ing.id)
-              ? 1
-              : 0,
+            opacity: (isIncluded ? selectedIncluded : selectedExtras).includes(ing.id) ? 1 : 0,
             transform: [
               {
                 scale: (isIncluded ? selectedIncluded : selectedExtras).includes(ing.id)
@@ -220,25 +200,19 @@ export default function ProductDetail({ route }) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#D32F2F" />
-        <Text style={styles.loadingText}>Loading product details...</Text>
+        <Text style={styles.loadingText}>
+          {t('productDetail.loading')}
+        </Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header con fondo borroso */}
-      <AnimatedBlurView
-        intensity={100}
-        tint="light"
-        style={[styles.header, { opacity: headerOpacity }]}
-      >
+      <AnimatedBlurView intensity={100} tint="light" style={[styles.header, { opacity: headerOpacity }]}>
         <Text style={styles.headerTitle}>{product.name}</Text>
-        <TouchableOpacity
-          style={styles.cartButton}
-          onPress={() => navigation.navigate('CartScreen')}
-        >
-          <MaterialCommunityIcons name="cart-outline" size={26} color="#000000" />
+        <TouchableOpacity style={styles.cartButton} onPress={() => navigation.navigate('CartScreen')}>
+          <MaterialCommunityIcons name="cart-outline" size={26} color="#000" />
           {cart.length > 0 && (
             <View style={styles.badgeContainer}>
               <Text style={styles.badgeText}>{cart.length}</Text>
@@ -255,32 +229,23 @@ export default function ProductDetail({ route }) {
         )}
         scrollEventThrottle={16}
       >
-        {/* Botón de regresar (arriba a la izquierda) */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 15, left: 15, bottom: 15, right: 15 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={{ top:15,left:15,bottom:15,right:15 }}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
 
-        {/* Imagen del producto */}
         <Image source={{ uri: product.img }} style={styles.productImage} />
 
-        {/* Información del producto */}
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.name}</Text>
           <Text style={styles.description}>{product.description}</Text>
         </View>
 
-        {/* Opciones Single/Double solo para hamburguesas */}
         {isHamburger && (
           <View style={styles.optionsContainer}>
-            {['Single', 'Double'].map((option) => {
-              const priceForOption =
-                option === 'Single'
-                  ? (parseFloat(product.price) || 0).toFixed(2)
-                  : ((parseFloat(product.price) || 0) * 1.5).toFixed(2);
+            {['Simple', 'Doble'].map(option => {
+              const price = option === 'Simple'
+                ? parseFloat(product.price)
+                : parseFloat(product.price) * 1.5;
               return (
                 <TouchableOpacity
                   key={option}
@@ -290,64 +255,48 @@ export default function ProductDetail({ route }) {
                     selectedOption === option && styles.selectedOption,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedOption === option && styles.selectedOptionText,
-                    ]}
-                  >
-                    {option}
+                  <Text style={[
+                    styles.optionText,
+                    selectedOption === option && styles.selectedOptionText,
+                  ]}>
+                    {t(option === 'Simple' ? 'productDetail.optionSimple' : 'productDetail.optionDouble')}
                   </Text>
-                  <Text style={styles.optionPrice}>${priceForOption}</Text>
+                  <Text style={styles.optionPrice}>${price.toFixed(2)}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         )}
 
-        {/* Ingredientes incluidos */}
         {isHamburger && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Included Ingredients</Text>
+            <Text style={styles.sectionTitle}>{t('productDetail.sectionIncluded')}</Text>
             <View style={styles.ingredientGrid}>
-              {includedIngredients.map((ing) =>
-                renderIngredientButton(ing, true)
-              )}
+              {includedIngredients.map(ing => renderIngredientButton(ing, true))}
             </View>
           </View>
         )}
 
-        {/* Ingredientes extra */}
         {isHamburger && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Extra Ingredients</Text>
+            <Text style={styles.sectionTitle}>{t('productDetail.sectionExtras')}</Text>
             <View style={styles.ingredientGrid}>
-              {extraIngredients.map((ing) =>
-                renderIngredientButton(ing, false)
-              )}
+              {extraIngredients.map(ing => renderIngredientButton(ing, false))}
             </View>
           </View>
         )}
 
-        {/* Espacio final para que el contenido no quede oculto por el footer */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Footer con cantidad y botón de agregar */}
       <BlurView intensity={100} tint="light" style={styles.footer}>
         <View style={styles.quantityContainer}>
-          <TouchableOpacity
-            onPress={() => adjustQuantity(-1)}
-            style={styles.quantityButton}
-          >
-            <MaterialCommunityIcons name="minus" size={20} color="#FFFFFF" />
+          <TouchableOpacity onPress={() => adjustQuantity(-1)} style={styles.quantityButton}>
+            <MaterialCommunityIcons name="minus" size={20} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.quantityText}>{quantity}</Text>
-          <TouchableOpacity
-            onPress={() => adjustQuantity(1)}
-            style={styles.quantityButton}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+          <TouchableOpacity onPress={() => adjustQuantity(1)} style={styles.quantityButton}>
+            <MaterialCommunityIcons name="plus" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
 
@@ -359,12 +308,12 @@ export default function ProductDetail({ route }) {
           <MaterialCommunityIcons
             name={isAdding ? 'check' : 'cart'}
             size={24}
-            color="#FFFFFF"
+            color="#FFF"
           />
           <Text style={styles.addButtonText}>
             {isAdding
-              ? 'Added!'
-              : `Add $${(calculateBasePrice() * quantity).toFixed(2)}`}
+              ? t('productDetail.buttonAdded')
+              : t('productDetail.buttonAdd', { price: (calculateBasePrice() * quantity).toFixed(2) })}
           </Text>
         </TouchableOpacity>
       </BlurView>
@@ -373,6 +322,8 @@ export default function ProductDetail({ route }) {
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

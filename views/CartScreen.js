@@ -1,3 +1,4 @@
+// views/CartScreen.jsx
 import React, { useState } from 'react';
 import {
   View,
@@ -11,54 +12,51 @@ import {
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Toast from 'react-native-toast-message';
+import { useTranslation } from 'react-i18next';
 
 // Importa tus acciones necesarias
 import { removeItem, clearCart, updateItemQuantity } from '../redux/slices/cart.slice';
 import { setCurrentOrder, setOrderItems } from '../redux/slices/order.slice';
 
 const { width } = Dimensions.get('window');
-const cardWidth = width - 40; // Full width minus padding
 
 export default function CartScreen({ navigation }) {
-  const dispatch = useDispatch();
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector(s => s.user.language);
+  // sincroniza i18n con Redux
+  React.useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
 
-  // Estado del carrito y demás datos desde Redux
-  const cartItems = useSelector((state) => state.cart.items);
-  const partner_id = useSelector((state) => state.partner.partner_id);
-  const user_id = useSelector((state) => state.user.userInfo.id);
+  const dispatch   = useDispatch();
+  const cartItems  = useSelector(state => state.cart.items);
+  const partner_id = useSelector(state => state.partner.partner_id);
+  const user_id    = useSelector(state => state.user.userInfo.id);
 
-  // Para controlar expandir/colapsar ingredientes en cada ítem
   const [expandedItems, setExpandedItems] = useState({});
 
-  // Funciones de dispatch para manipular el carrito
-  const handleRemoveItem = (id) => {
+  const handleRemoveItem = id => {
     dispatch(removeItem(id));
   };
-
   const handleClearCart = () => {
     dispatch(clearCart());
   };
-
   const handleUpdateQuantity = (id, quantity) => {
-    if (quantity > 0) {
-      dispatch(updateItemQuantity({ id, quantity }));
-    }
+    if (quantity > 0) dispatch(updateItemQuantity({ id, quantity }));
+  };
+  const toggleItemExpansion = id => {
+    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const toggleItemExpansion = (id) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  // Función para mostrar ingredientes
   const renderIngredients = (ingredients, type) => (
     <View style={styles.ingredientsContainer}>
       <Text style={styles.ingredientsTitle}>
-        {type === 'included' ? 'Included Ingredients:' : 'Extra Ingredients:'}
+        {type === 'included'
+          ? t('cart.ingredientsIncluded')
+          : t('cart.ingredientsExtra')}
       </Text>
-      {ingredients.map((ingredient) => (
+      {ingredients.map(ingredient => (
         <View key={ingredient.id} style={styles.ingredientItem}>
           <Icon
             name={ingredient.included ? 'check-circle' : 'minus-circle'}
@@ -76,7 +74,6 @@ export default function CartScreen({ navigation }) {
     </View>
   );
 
-  // Render de cada producto
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
       <View style={styles.itemHeader}>
@@ -88,19 +85,33 @@ export default function CartScreen({ navigation }) {
               <Icon name="close" size={24} color="#D32F2F" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.itemOption}>{item.option}</Text>
+          {item.option && (
+            <Text style={styles.itemOption}>{item.option}</Text>
+          )}
           <View style={styles.itemDetails}>
             <View style={styles.quantityContainer}>
               <TouchableOpacity
-                onPress={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                onPress={() =>
+                  handleUpdateQuantity(item.id, item.quantity - 1)
+                }
               >
-                <Icon name="minus-circle-outline" size={24} color="#D32F2F" />
+                <Icon
+                  name="minus-circle-outline"
+                  size={24}
+                  color="#D32F2F"
+                />
               </TouchableOpacity>
               <Text style={styles.quantityText}>{item.quantity}</Text>
               <TouchableOpacity
-                onPress={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                onPress={() =>
+                  handleUpdateQuantity(item.id, item.quantity + 1)
+                }
               >
-                <Icon name="plus-circle-outline" size={24} color="#D32F2F" />
+                <Icon
+                  name="plus-circle-outline"
+                  size={24}
+                  color="#D32F2F"
+                />
               </TouchableOpacity>
             </View>
             <Text style={styles.itemPrice}>
@@ -110,7 +121,6 @@ export default function CartScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Botón de expandir/cerrar detalles de ingredientes */}
       <TouchableOpacity
         style={styles.expandButton}
         onPress={() => toggleItemExpansion(item.id)}
@@ -122,75 +132,74 @@ export default function CartScreen({ navigation }) {
         />
       </TouchableOpacity>
 
-      {/* Muestra los ingredientes si está expandido */}
       {expandedItems[item.id] && (
         <View style={styles.expandedContent}>
-          {renderIngredients(item.includedIngredients, 'included')}
-          {item.extraIngredients.length > 0 &&
+          {item.includedIngredients?.length > 0 &&
+            renderIngredients(item.includedIngredients, 'included')}
+          {item.extraIngredients?.length > 0 &&
             renderIngredients(item.extraIngredients, 'extra')}
         </View>
       )}
     </View>
   );
 
-  // Cálculo del total general (subtotal)
   const totalGeneral = cartItems.reduce(
-    (sum, item) => sum + item.quantity * parseFloat(item.pricePerUnit),
+    (sum, item) =>
+      sum + item.quantity * parseFloat(item.pricePerUnit),
     0
   );
 
-  // Manejo de la acción al pasar a la siguiente pantalla
   const handleCheckout = () => {
-    // Despacha los datos a order.slice
     dispatch(
       setCurrentOrder({
         user_id,
         partner_id,
-        price: totalGeneral, // Subtotal
+        price: totalGeneral,
       })
     );
-    // Guarda los ítems con sus detalles en la orden
     dispatch(setOrderItems(cartItems));
-
-    // Navega a la pantalla de Checkout o Pago
     navigation.navigate('ConfirmationScreen');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header del carrito */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Cart</Text>
+        <Text style={styles.headerTitle}>{t('cart.headerTitle')}</Text>
         <TouchableOpacity onPress={handleClearCart}>
           <Icon name="trash-can-outline" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Listado de productos */}
       <FlatList
         data={cartItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cart-off" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyText}>Your cart is empty</Text>
+            <Text style={styles.emptyText}>{t('cart.empty')}</Text>
           </View>
         }
       />
 
-      {/* Footer con total y botón de checkout */}
       <View style={styles.footer}>
         <View style={styles.totalContainer}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>${totalGeneral.toFixed(2)}</Text>
+          <Text style={styles.totalLabel}>{t('cart.total')}</Text>
+          <Text style={styles.totalAmount}>
+            ${totalGeneral.toFixed(2)}
+          </Text>
         </View>
-        <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
-          <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+        <TouchableOpacity
+          style={styles.checkoutButton}
+          onPress={handleCheckout}
+        >
+          <Text style={styles.checkoutButtonText}>
+            {t('cart.checkout')}
+          </Text>
           <Icon name="arrow-right" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -198,7 +207,6 @@ export default function CartScreen({ navigation }) {
   );
 }
 
-/* --- ESTILOS --- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -369,4 +377,3 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 });
-

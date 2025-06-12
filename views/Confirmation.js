@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// views/OrderSummaryScreen.jsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,241 +8,188 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Image,
+  Linking,
+  Alert,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Toast from 'react-native-toast-message';
-import { useStripe } from '@stripe/stripe-react-native';
-import * as WebBrowser from 'expo-web-browser';
-import { API_URL } from '@env';
-import { addCurrentOrderToActiveOrders, clearCurrentOrder } from '../redux/slices/order.slice';
-import { clearCart } from '../redux/slices/cart.slice';
 import axios from 'react-native-axios';
-import { Linking } from 'react-native';
+import { API_URL } from '@env';
+import {
+  addCurrentOrderToActiveOrders,
+  clearCurrentOrder,
+} from '../redux/slices/order.slice';
+import { clearCart } from '../redux/slices/cart.slice';
+import { useTranslation } from 'react-i18next';
 
 export default function OrderSummaryScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector(s => s.user.language);
+  useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
+
   const dispatch = useDispatch();
-  const currentAddress = useSelector((state) => state.user.currentAddress);
-  const currentOrder = useSelector((state) => state.order.currentOrder);
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const currentAddress = useSelector(s => s.user.currentAddress);
+  const currentOrder = useSelector(s => s.order.currentOrder);
 
-  const [isError, setIsError] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [expandedItems, setExpandedItems] = useState({});
-
-  const { items = [], price = 0, deliveryFee = 0 } = currentOrder;
+  const items = currentOrder.items ?? [];
+  const priceNum = Number(currentOrder.price ?? 0);
+  const deliveryFeeNum = Number(currentOrder.deliveryFee ?? 0);
   const taxes = 0.54;
-  const total = price + deliveryFee + taxes;
+  const totalNum = priceNum + deliveryFeeNum + taxes;
 
-  // --- STRIPE Payment Flow ---
-  const handleStripePayment = async () => {
-    if (!currentAddress) {
-      showAddressError();
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const paymentResponse = await axios.post(`${API_URL}/payment/intent`, {
-        amount: Math.floor(total * 100),
-      });
-
-      const { clientSecret } = paymentResponse.data;
-
-      const initResponse = await initPaymentSheet({
-        paymentIntentClientSecret: clientSecret,
-        merchantDisplayName: 'Premier Burguer',
-        allowsDelayedPaymentMethods: true,
-      });
-
-      if (initResponse.error) {
-        Alert.alert('Error', initResponse.error.message);
-        setIsProcessing(false);
-        return;
-      }
-
-      const paymentResult = await presentPaymentSheet();
-
-      if (paymentResult.error) {
-        Alert.alert('Payment failed', paymentResult.error.message);
-      } else {
-        await createOrderInBackend();
-      }
-    } catch (error) {
-      console.error('Error during Stripe order process:', error);
-      Alert.alert('Error', 'Something went wrong during the payment process.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // --- MERCADO PAGO Flow ---
-  const handleMercadoPago = async () => {
-    if (!currentAddress) {
-      showAddressError();
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const itemsToSend = [
-        {
-          name: 'Order Total',
-          quantity: 1,
-          price: parseFloat(total.toFixed(2)),
-          currency_id: 'ARS',
-        },
-      ];
-
-      const mpResponse = await axios.post(
-        `${API_URL}/payment/mp/create-preference`,
-        itemsToSend
-      );
-      const { init_point } = mpResponse.data;
-
-      const supported = await Linking.canOpenURL(init_point);
-      if (supported) {
-        await Linking.openURL(init_point);
-      } else {
-        Alert.alert('Error', 'No se puede abrir la URL: ' + init_point);
-      }
-    } catch (error) {
-      console.error('Error during Mercado Pago process:', error);
-      Alert.alert('Error', 'Something went wrong during the Mercado Pago payment process.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Crea la orden en tu backend
-  const createOrderInBackend = async () => {
-    try {
-      const orderData = {
-        ...currentOrder,
-        deliveryAddress: currentAddress.street,
-        finalPrice: total.toFixed(2),
-        deliveryFee: deliveryFee.toFixed(2),
-        price: price.toFixed(2),
-      };
-
-      const orderResponse = await axios.post(`${API_URL}/order/`, orderData);
-      const { order, orderProducts: items } = orderResponse.data;
-
-      console.log(order, 'order');
-
-      dispatch(addCurrentOrderToActiveOrders({ order, items }));
-      dispatch(clearCurrentOrder());
-      dispatch(clearCart());
-
-      // Espera 2 segundos antes de navegar
-      setTimeout(() => {
-        navigation.navigate('OrderTracking', { orderId: order.id });
-      }, 2000);
-    } catch (err) {
-      console.error('Error creating order:', err);
-      Alert.alert('Error', 'Failed to create the order in backend');
-    }
-  };
+  const [isProcessing, setProcessing] = useState(false);
+  const [expanded, setExpanded] = useState({});
 
   const showAddressError = () => {
-    setIsError(true);
     Toast.show({
       type: 'error',
-      text1: 'You need to confirm address',
+      text1: t('orderSummary.confirmAddressError'),
       position: 'bottom',
       visibilityTime: 2000,
       bottomOffset: 80,
     });
-    setTimeout(() => setIsError(false), 2000);
   };
 
-  const toggleItemExpansion = (itemId) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
+  const handleMercadoPago = async () => {
+    if (!currentAddress) return showAddressError();
+    setProcessing(true);
+    try {
+      const orderPayload = {
+        deliveryAddress: currentAddress.street,
+        partner_id: currentOrder.partner_id,
+        user_id: currentOrder.user_id,
+        finalPrice: totalNum.toFixed(2),
+        deliveryFee: deliveryFeeNum.toFixed(2),
+        price: priceNum.toFixed(2),
+      };
+      const itemsPayload = items.length
+        ? items.map(i => ({
+            name: i.name,
+            quantity: i.quantity,
+            price: Number(i.totalPrice),
+            currency_id: 'ARS',
+          }))
+        : [
+            {
+              name: t('orderSummary.defaultItem'),
+              quantity: 1,
+              price: totalNum,
+              currency_id: 'ARS',
+            },
+          ];
+
+      const { data } = await axios.post(
+        `${API_URL}/payment/mp/create-preference`,
+        { order: orderPayload, items: itemsPayload }
+      );
+      const { preference, order } = data;
+
+      dispatch(addCurrentOrderToActiveOrders({ order, items }));
+      dispatch(clearCart());
+
+      if (await Linking.canOpenURL(preference.init_point)) {
+        Linking.openURL(preference.init_point);
+      } else {
+        Alert.alert(t('orderSummary.mpErrorTitle'), t('orderSummary.mpErrorOpen'));
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert(t('orderSummary.mpErrorTitle'), t('orderSummary.mpError'));
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const renderIngredients = (title, ingredients = []) => {
-    if (!ingredients.length) return null;
-    return (
+  const toggle = id => setExpanded(e => ({ ...e, [id]: !e[id] }));
+
+  const renderIngredients = (title, ingr = []) =>
+    !ingr.length ? null : (
       <View style={styles.ingredientsContainer}>
         <Text style={styles.ingredientsTitle}>{title}</Text>
-        {ingredients.map((ingredient, index) => (
-          <View key={index} style={styles.ingredientRow}>
+        {ingr.map((g, i) => (
+          <View key={i} style={styles.ingredientRow}>
             <Text style={styles.ingredientBullet}>•</Text>
-            <Text style={styles.ingredientName}>{ingredient.name}</Text>
-            {ingredient.price && (
+            <Text style={styles.ingredientName}>{g.name}</Text>
+            {g.price != null && (
               <Text style={styles.ingredientPrice}>
-                +${parseFloat(ingredient.price).toFixed(2)}
+                +${Number(g.price).toFixed(2)}
               </Text>
             )}
           </View>
         ))}
       </View>
     );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color="#FFFFFF" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Icon name="arrow-left" size={22} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Summary</Text>
-        <View style={{ width: 24, height: 24 }} />
+        <Text style={styles.headerTitle}>{t('orderSummary.headerTitle')}</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Contenido principal */}
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Dirección de entrega */}
+      <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        {/* Address Section */}
         <View style={styles.addressSection}>
-          <Text style={styles.addressLabel}>Delivery Address:</Text>
-          <Text style={styles.addressText}>
-            {currentAddress ? currentAddress.street : ''}
-          </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Addresses')}>
+          <View style={styles.addressHeader}>
+            <Icon name="map-marker" size={20} color="#E53935" />
+            <Text style={styles.addressLabel}>{t('orderSummary.addressLabel')}</Text>
+          </View>
+          {currentAddress?.street ? (
+            <Text style={styles.addressText}>{currentAddress.street}</Text>
+          ) : (
+            <Text style={styles.noAddressText}>{t('orderSummary.noAddress')}</Text>
+          )}
+          <TouchableOpacity
+            style={styles.changeAddressButton}
+            onPress={() => navigation.navigate('Addresses')}
+          >
             <Text style={styles.changeAddressText}>
-              {currentAddress?.street ? 'Change address' : 'Confirm address'}
+              {currentAddress
+                ? t('orderSummary.changeAddress')
+                : t('orderSummary.confirmAddress')}
             </Text>
+            <Icon name="chevron-right" size={16} color="#E53935" />
           </TouchableOpacity>
         </View>
 
-        {/* Items */}
-        {items.length > 0 && (
+        {/* Items Section */}
+        {!!items.length && (
           <View style={styles.itemsContainer}>
-            <Text style={styles.sectionTitle}>Items in your order</Text>
-            {items.map((item) => {
-              const isExpanded = expandedItems[item.id] || false;
+            <View style={styles.sectionHeader}>
+              <Icon name="food" size={20} color="#E53935" />
+              <Text style={styles.sectionTitle}>{t('orderSummary.itemsTitle')}</Text>
+            </View>
+            {items.map(it => {
+              const open = expanded[it.id];
               return (
-                <View key={item.id} style={styles.itemBlock}>
-                  <View style={styles.itemRow}>
-                    <Text style={styles.itemName}>
-                      {item.quantity}x {item.name}
-                    </Text>
+                <View key={it.id} style={styles.itemBlock}>
+                  <TouchableOpacity onPress={() => toggle(it.id)} style={styles.itemRow}>
+                    <View style={styles.itemQuantity}>
+                      <Text style={styles.itemQuantityText}>{it.quantity}</Text>
+                    </View>
+                    <Text style={styles.itemName}>{it.name}</Text>
                     <View style={styles.itemRight}>
                       <Text style={styles.itemPrice}>
-                        ${parseFloat(item.totalPrice).toFixed(2)}
+                        ${Number(it.totalPrice).toFixed(2)}
                       </Text>
-                      <TouchableOpacity
-                        onPress={() => toggleItemExpansion(item.id)}
-                        style={styles.expandButton}
-                      >
-                        <Icon
-                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={20}
-                          color="#000000"
-                        />
-                      </TouchableOpacity>
+                      <Icon
+                        name={open ? 'chevron-up' : 'chevron-down'}
+                        size={18}
+                        color="#6B7280"
+                      />
                     </View>
-                  </View>
-                  {isExpanded && (
+                  </TouchableOpacity>
+                  {open && (
                     <View style={styles.expandedContent}>
-                      {renderIngredients('Included:', item.includedIngredients)}
-                      {renderIngredients('Extras:', item.extraIngredients)}
+                      {renderIngredients(t('orderSummary.includedTitle'), it.includedIngredients)}
+                      {renderIngredients(t('orderSummary.extraTitle'), it.extraIngredients)}
                     </View>
                   )}
                 </View>
@@ -250,68 +198,55 @@ export default function OrderSummaryScreen({ navigation }) {
           </View>
         )}
 
-        {/* Resumen de costos */}
+        {/* Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.sectionTitle}>Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Subtotal</Text>
-            <Text style={styles.summaryText}>${price.toFixed(2)}</Text>
+          <View style={styles.sectionHeader}>
+            <Icon name="receipt" size={20} color="#E53935" />
+            <Text style={styles.sectionTitle}>{t('orderSummary.summaryTitle')}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Fees</Text>
-            <Text style={styles.summaryText}>${deliveryFee.toFixed(2)}</Text>
+            <Text style={styles.summaryText}>{t('orderSummary.subtotal')}</Text>
+            <Text style={styles.summaryValue}>${priceNum.toFixed(2)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Taxes</Text>
-            <Text style={styles.summaryText}>${taxes.toFixed(2)}</Text>
+            <Text style={styles.summaryText}>{t('orderSummary.delivery')}</Text>
+            <Text style={styles.summaryValue}>${deliveryFeeNum.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>{t('orderSummary.taxes')}</Text>
+            <Text style={styles.summaryValue}>${taxes.toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryText, styles.totalLabel]}>Total</Text>
-            <Text style={[styles.summaryText, styles.totalAmount]}>
-              ${total.toFixed(2)}
-            </Text>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>{t('orderSummary.total')}</Text>
+            <Text style={styles.totalAmount}>${totalNum.toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* Footer con botones de pago */}
       <View style={styles.footer}>
-        {/* Botón: Stripe */}
-        <TouchableOpacity
-          style={[styles.paymentButton, { marginRight: 10 }]}
-          onPress={handleStripePayment}
-          disabled={isProcessing}
-        >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <View style={styles.buttonContent}>
-              <Image
-                source={require('../assets/stripe-logo.jpg')}
-                style={styles.buttonLogo}
-              />
-              <Text style={styles.continueButtonText}>Pay with Stripe</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Botón: Mercado Pago */}
         <TouchableOpacity
           style={styles.paymentButton}
           onPress={handleMercadoPago}
           disabled={isProcessing}
+          activeOpacity={0.8}
         >
           {isProcessing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <View style={styles.buttonContent}>
-              <Image
-                source={require('../assets/mercadopago.jpg')}
-                style={styles.buttonLogo}
-              />
-              <Text style={styles.continueButtonText}>Pay with Mercado Pago</Text>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#FFF" size="small" />
+              <Text style={styles.loadingText}>{t('orderSummary.processing')}</Text>
             </View>
+          ) : (
+            <>
+              <View style={styles.paymentLogoContainer}>
+                <Image
+                  source={require('../assets/mercadopago.jpg')}
+                  style={styles.paymentLogo}
+                />
+              </View>
+              <Text style={styles.paymentButtonText}>{t('orderSummary.payWithMP')}</Text>
+              <Icon name="arrow-right" size={20} color="#FFF" />
+            </>
           )}
         </TouchableOpacity>
       </View>
@@ -322,184 +257,111 @@ export default function OrderSummaryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D32F2F',
-    paddingHorizontal: 20,
+    backgroundColor: '#E53935',
     paddingVertical: 16,
+    paddingHorizontal: 20,
     justifyContent: 'space-between',
+    elevation: 4,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  contentContainer: {
-    padding: 16,
-  },
+  backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center' },
+  contentContainer: { padding: 16, paddingBottom: 24 },
   addressSection: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
-    elevation: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2.5,
   },
-  addressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
+  addressHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  addressLabel: { fontSize: 16, fontWeight: '700', color: '#111827', marginLeft: 8 },
+  addressText: { fontSize: 15, color: '#4B5563', marginBottom: 12, paddingLeft: 28 },
+  noAddressText: {
+    fontSize: 15,
+    color: '#EF4444',
+    fontStyle: 'italic',
+    marginBottom: 12,
+    paddingLeft: 28,
   },
-  addressText: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 8,
-  },
-  changeAddressText: {
-    fontSize: 14,
-    color: '#D32F2F',
-    textDecorationLine: 'underline',
-  },
-  itemsContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#000000',
-  },
+  changeAddressButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  changeAddressText: { fontSize: 14, color: '#E53935', fontWeight: '600', marginRight: 4 },
+  itemsContainer: { marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginLeft: 8 },
   itemBlock: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 12,
-    shadowColor: '#000000',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 2.5,
   },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  itemRow: { flexDirection: 'row', alignItems: 'center' },
+  itemQuantity: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    width: 24,
+    height: 24,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  itemName: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '600',
-  },
-  itemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemPrice: {
-    fontSize: 14,
-    color: '#D32F2F',
-    marginRight: 4,
-  },
-  expandButton: {
-    padding: 4,
-  },
-  expandedContent: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 8,
-  },
-  ingredientsContainer: {
-    marginBottom: 8,
-  },
-  ingredientsTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#000000',
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 12,
-    marginBottom: 2,
-  },
-  ingredientBullet: {
-    marginRight: 4,
-    color: '#9CA3AF',
-  },
-  ingredientName: {
-    fontSize: 13,
-    color: '#000000',
-    flex: 1,
-  },
-  ingredientPrice: {
-    fontSize: 13,
-    color: '#D32F2F',
-    fontWeight: 'bold',
-  },
+  itemQuantityText: { fontSize: 12, fontWeight: '700', color: '#4B5563' },
+  itemName: { fontSize: 15, fontWeight: '600', color: '#111827', flex: 1 },
+  itemRight: { flexDirection: 'row', alignItems: 'center' },
+  itemPrice: { fontSize: 15, fontWeight: '700', color: '#E53935', marginRight: 8 },
+  expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 12 },
+  ingredientsContainer: { marginBottom: 8 },
+  ingredientsTitle: { fontSize: 14, fontWeight: '600', color: '#4B5563', marginBottom: 6 },
+  ingredientRow: { flexDirection: 'row', alignItems: 'center', marginLeft: 12, marginBottom: 4 },
+  ingredientBullet: { marginRight: 6, color: '#9CA3AF', fontSize: 16 },
+  ingredientName: { fontSize: 14, color: '#4B5563', flex: 1 },
+  ingredientPrice: { fontSize: 14, color: '#E53935', fontWeight: '600' },
   summaryCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     elevation: 2,
-    shadowColor: '#000000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2.5,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#000000',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 8,
-  },
-  totalLabel: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  totalAmount: {
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  footer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'space-between',
-  },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 28 },
+  summaryText: { fontSize: 15, color: '#4B5563' },
+  summaryValue: { fontSize: 15, color: '#111827', fontWeight: '500' },
+  divider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 12, marginLeft: 28 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 28 },
+  totalLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  totalAmount: { fontSize: 18, fontWeight: '700', color: '#E53935' },
+  footer: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   paymentButton: {
-    flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#D32F2F',
-    borderRadius: 8,
+    backgroundColor: '#E53935',
+    borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  buttonLogo: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
-    resizeMode: 'contain',
-  },
+  paymentLogoContainer: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 6, marginRight: 12 },
+  paymentLogo: { width: 24, height: 24, resizeMode: 'contain' },
+  paymentButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginLeft: 8 },
 });

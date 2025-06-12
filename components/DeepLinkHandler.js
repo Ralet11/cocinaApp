@@ -1,31 +1,33 @@
-// components/DeepLinkHandler.js
-import React, { useEffect } from 'react';
-import { Linking } from 'react-native';
+// components/DeepLinkHandler.jsx
+import { useEffect } from 'react';
+import * as Linking from 'expo-linking';
+import { useNavigation } from '@react-navigation/native';
 
-const DeepLinkHandler = ({ onDeepLink }) => {
-  useEffect(() => {
-    const handleUrl = (event) => {
-      const { url } = event;
-      console.log('Deep link recibido:', url);
-      onDeepLink(url);
-    };
-
-    // Escucha los eventos de deep link
-    const subscription = Linking.addEventListener('url', handleUrl);
-
-    // Revisa si la app se abrió mediante un deep link inicialmente
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        onDeepLink(url);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [onDeepLink]);
-
-  return null;
+const SCREEN_MAP = {
+  'payment-success': 'PaymentSuccess',
+  'payment-failure': 'PaymentFailure',
+  'payment-pending': 'PaymentPending',
 };
 
-export default DeepLinkHandler;
+export default function DeepLinkHandler() {
+  const navigation = useNavigation();
+
+  function routeFromUrl(url) {
+    const { path, queryParams } = Linking.parse(url);   // ← usa “path”
+    if (SCREEN_MAP[path]) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: SCREEN_MAP[path], params: queryParams }],
+      });
+    }
+  }
+
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => routeFromUrl(url));
+    Linking.getInitialURL().then(url => url && routeFromUrl(url));
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null; // no UI
+}

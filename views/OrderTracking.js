@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// views/OrderTrackingScreen.jsx
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,157 +9,172 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Dimensions,
-} from 'react-native';
-import { useSelector } from 'react-redux';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import axios from 'react-native-axios';
-import { API_URL } from '@env';
-
-import { OrderStatusTracker } from '../components/OrderTracker';
-
-const { width } = Dimensions.get('window');
+} from "react-native";
+import { useSelector } from "react-redux";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import axios from "react-native-axios";
+import { API_URL } from "@env";
+import { OrderStatusTracker } from "../components/OrderTracker";
+import { useTranslation } from "react-i18next";
 
 export default function OrderTrackingScreen() {
-  const route = useRoute();
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector((s) => s.user.language);
+  const { params } = useRoute();
   const navigation = useNavigation();
-  const { orderId } = route.params;
-
-  // Unimos las órdenes activas y las históricas en una sola lista
-  const allActiveOrders = useSelector((state) => state.order.activeOrders);
-  const allHistoricOrders = useSelector((state) => state.order.historicOrders);
-
-  // Concatenamos ambos arrays para poder buscar la orden
-  const allOrders = [...allActiveOrders, ...allHistoricOrders];
-
-  // Buscamos la orden solicitada
-  const currentOrder = allOrders.find((o) => o.id === orderId);
-
-  const [orderProducts, setOrderProducts] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const { orderId } = params;
 
   useEffect(() => {
-    const fetchOrderProducts = async () => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
+
+  const { activeOrders, historicOrders } = useSelector((s) => s.order);
+  const currentOrder =
+    [...activeOrders, ...historicOrders].find((o) => o.id === orderId) || null;
+
+  const [items, setItems] = useState(currentOrder?.items || []);
+  const [loading, setLoad] = useState(false);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      if (items.length || !orderId) return;
+      setLoad(true);
       try {
-        setLoading(true);
-        const response = await axios.get(`${API_URL}/order-products/getByOrder/${orderId}`);
-        setOrderProducts(response.data);
-      } catch (error) {
-        console.log('Error fetching order products:', error);
+        const { data } = await axios.get(
+          `${API_URL}/order-products/getByOrder/${orderId}`
+        );
+        setItems(
+          data.map((op) => ({
+            id: op.id,
+            image: op.product?.img,
+            name: op.product?.name,
+            quantity: op.quantity,
+            totalPrice: parseFloat(op.price),
+          }))
+        );
+      } catch (err) {
+        console.error("order-products error:", err);
       } finally {
-        setLoading(false);
+        setLoad(false);
       }
     };
-
-    if (orderId) {
-      fetchOrderProducts();
-    }
+    fetchItems();
   }, [orderId]);
-
-  const renderOrderItems = () => {
-    if (!orderProducts || !orderProducts.length) {
-      return (
-        <Text style={styles.infoText}>
-          No products found for this order.
-        </Text>
-      );
-    }
-
-    return orderProducts.map((orderItem) => (
-      <View key={orderItem.id} style={styles.itemContainer}>
-        <Image
-          source={{
-            uri: orderItem.product?.imageUrl || 'https://via.placeholder.com/50',
-          }}
-          style={styles.itemImage}
-        />
-        <View style={styles.itemDetails}>
-          <Text style={styles.itemName}>
-            {orderItem.quantity}x {orderItem.product?.name}
-          </Text>
-          <Text style={styles.itemPrice}>
-            ${parseFloat(orderItem.price).toFixed(2)}
-          </Text>
-        </View>
-      </View>
-    ));
-  };
 
   if (!currentOrder) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>
-          Order not found or no longer active.
-        </Text>
+        <Text style={styles.errorTxt}>{t("orderTracking.errorNotFound")}</Text>
       </SafeAreaView>
     );
   }
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" style={styles.loader} />
+        <ActivityIndicator size="large" color="#D32F2F" style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
+  const renderItems = () =>
+    items.length ? (
+      items.map((it) => (
+        <View key={it.id} style={styles.itemBox}>
+          <Image
+            source={{ uri: it.image || "https://via.placeholder.com/50" }}
+            style={styles.itemImg}
+          />
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemName}>
+              {it.quantity}× {it.name}
+            </Text>
+            <Text style={styles.itemPrice}>
+              ${it.totalPrice.toFixed(2)}
+            </Text>
+          </View>
+        </View>
+      ))
+    ) : (
+      <Text style={styles.emptyTxt}>{t("orderTracking.emptyItems")}</Text>
+    );
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Encabezado */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate('HomeTabs')}>
-          <Icon name="arrow-left" size={24} color="#FFFFFF" />
+        <TouchableOpacity onPress={() => navigation.navigate("HomeTabs")}>
+          <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Tracking</Text>
+        <Text style={styles.headerTitle}>
+          {t("orderTracking.headerTitle")}
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Contenido principal */}
       <ScrollView
-        contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
       >
-        {/* Tarjeta con el estado actual de la orden */}
-        <View style={styles.cardContainer}>
-          <OrderStatusTracker currentStatus={currentOrder.status || 'pendiente'} />
+        {/* Tracker de estado */}
+        <View style={styles.card}>
+          <OrderStatusTracker
+            currentStatus={currentOrder.status || "pendiente"}
+          />
         </View>
 
         {/* Detalles de la orden */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Order Details</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Order ID:</Text>
-            <Text style={styles.detailValue}>#{currentOrder.id}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total:</Text>
-            <Text style={styles.detailValue}>
-              ${parseFloat(currentOrder.finalPrice || 0).toFixed(2)}
-            </Text>
-          </View>
-          <View style={[styles.detailRow, styles.lastDetailRow]}>
-            <Text style={styles.detailLabel}>Delivery Address:</Text>
-            <Text style={styles.detailValue} numberOfLines={2}>
-              {currentOrder.deliveryAddress || 'No address provided'}
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>
+            {t("orderTracking.detailsTitle")}
+          </Text>
+          {[
+            [
+              "orderTracking.label.orderCode",
+              currentOrder.code,
+            ],
+            [
+              "orderTracking.label.subtotal",
+              `$${parseFloat(currentOrder.price).toFixed(2)}`,
+            ],
+            [
+              "orderTracking.label.delivery",
+              `$${parseFloat(currentOrder.deliveryFee).toFixed(2)}`,
+            ],
+            [
+              "orderTracking.label.total",
+              `$${parseFloat(currentOrder.finalPrice).toFixed(2)}`,
+              true,
+            ],
+          ].map(([key, val, bold], idx, arr) => (
+            <View
+              key={key}
+              style={[styles.row, idx === arr.length - 1 && styles.rowLast]}
+            >
+              <Text style={[styles.label, bold && styles.bold]}>
+                {t(key)}:
+              </Text>
+              <Text style={[styles.value, bold && styles.bold]}>{val}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Lista de productos */}
+        {/* Lista de ítems */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Items</Text>
-          {renderOrderItems()}
+          <Text style={styles.cardTitle}>
+            {t("orderTracking.itemsTitle")}
+          </Text>
+          {renderItems()}
         </View>
       </ScrollView>
 
-      {/* Footer con botón para volver al Home */}
+      {/* Pie de página */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => navigation.navigate('HomeTabs')}
+          style={styles.btn}
+          onPress={() => navigation.navigate("HomeTabs")}
         >
-          <Text style={styles.footerButtonText}>Back to Home</Text>
+          <Text style={styles.btnTxt}>{t("orderTracking.button.backHome")}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -166,127 +182,77 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5', // Igual al Dashboard
-  },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 80,
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    marginTop: 40,
-    textAlign: 'center',
-    color: '#D32F2F',
-    fontSize: 16,
-  },
+  container: { flex: 1, backgroundColor: "#F5F5F5" },
   header: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 12,
+    backgroundColor: "#D32F2F",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 12,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  cardContainer: {
-    marginTop: 16,
-    marginBottom: 12,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "600", color: "#FFF" },
+  scroll: { paddingHorizontal: 16, paddingBottom: 80 },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFF",
     borderRadius: 10,
     padding: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
+    marginTop: 16,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 6,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  cardTitle: { fontSize: 16, fontWeight: "600", marginBottom: 6 },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
-  lastDetailRow: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    flex: 1.2,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#111827',
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-  },
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  rowLast: { borderBottomWidth: 0 },
+  label: { fontSize: 14, color: "#6B7280" },
+  value: { fontSize: 14, color: "#111827", fontWeight: "500" },
+  bold: { fontWeight: "700" },
+  itemBox: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
-    borderBottomColor: '#F3F4F6',
     borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  itemImage: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    marginRight: 10,
-  },
-  itemDetails: {
-    flex: 1,
-  },
+  itemImg: { width: 46, height: 46, borderRadius: 23, marginRight: 10 },
+  itemInfo: { flex: 1 },
   itemName: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: "500",
+    color: "#1F2937",
     marginBottom: 3,
   },
-  itemPrice: {
-    fontSize: 13,
-    color: '#6B7280',
+  itemPrice: { fontSize: 13, color: "#6B7280" },
+  emptyTxt: { fontSize: 14, color: "#6B7280", paddingVertical: 8 },
+  errorTxt: {
+    marginTop: 40,
+    textAlign: "center",
+    color: "#D32F2F",
+    fontSize: 16,
   },
   footer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
-    width: '100%',
-    backgroundColor: 'white',
+    width: "100%",
+    backgroundColor: "#FFF",
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderTopColor: "#E5E7EB",
+    padding: 12,
   },
-  footerButton: {
-    backgroundColor: '#D32F2F',
+  btn: {
+    backgroundColor: "#D32F2F",
     borderRadius: 8,
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  footerButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  btnTxt: { color: "#FFF", fontSize: 15, fontWeight: "600" },
 });

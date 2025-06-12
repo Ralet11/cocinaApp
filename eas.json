@@ -8,11 +8,14 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+     "env": {
+        "API_URL": "https://ccmasociados.com/api"
+      }
     },
     "production": {
       "env": {
-        "API_URL": "https://54.90.29.65/api"
+        "API_URL": "https://ccmasociados.com/api"
       }
     }
   },

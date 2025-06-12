@@ -1,0 +1,202 @@
+{
+  "dashboard.loading": "Cargando datos...",
+  "dashboard.selectAddress": "Seleccionar dirección",
+  "dashboard.searchPlaceholder": "Buscar por nombre",
+  "dashboard.noProducts": "No se encontraron productos",
+  "dashboard.addToCart": "Agregar",
+
+  "login.title": "Premier Burguer",
+  "login.subtitle.signIn": "El sabor que te hace regresar",
+  "login.subtitle.reset": "Recupera tu contraseña",
+  "login.cardTitle.signIn": "Iniciar Sesión",
+  "login.cardTitle.reset": "Recuperar Contraseña",
+  "login.emailPlaceholder": "Correo electrónico",
+  "login.passwordPlaceholder": "Contraseña",
+  "login.forgotPasswordText": "¿Olvidaste tu contraseña?",
+  "login.button.signIn": "Iniciar Sesión",
+  "login.button.loading": "Cargando...",
+  "login.dividerOr": "o",
+  "login.noAccountText": "¿No tienes cuenta?",
+  "login.signUpText": "Regístrate",
+  "login.resetInfo": "Ingresa tu correo para recibir un enlace de recuperación.",
+  "login.button.reset": "Enviar enlace",
+  "login.button.resetLoading": "Enviando...",
+  "login.backToLogin": "Volver a Iniciar Sesión",
+
+  "login.error.invalidEmailTitle": "Correo inválido",
+  "login.error.invalidEmailMessage": "Por favor ingresa un correo electrónico válido.",
+  "login.error.invalidPasswordTitle": "Contraseña inválida",
+  "login.error.invalidPasswordMessage": "Por favor verifica tu contraseña e inténtalo de nuevo.",
+  "login.error.loginFailedTitle": "Error de inicio",
+  "login.error.loginFailedMessage": "Credenciales incorrectas. Intenta nuevamente.",
+  "login.error.serverErrorTitle": "Error",
+  "login.error.serverErrorMessage": "Falló la autenticación.",
+
+  "login.success.resetTitle": "Recuperación de contraseña",
+  "login.success.resetMessage": "Se envió el enlace de recuperación.",
+
+  "signup.headerTitle": "Premier Burguer",
+  "signup.headerSubtitle": "Crea tu cuenta para comenzar",
+  "signup.cardTitle": "Registro",
+  "signup.namePlaceholder": "Nombre",
+  "signup.lastNamePlaceholder": "Apellido",
+  "signup.emailPlaceholder": "Correo electrónico",
+  "signup.birthdatePlaceholder": "Fecha de nacimiento",
+  "signup.passwordPlaceholder": "Contraseña",
+  "signup.confirmPasswordPlaceholder": "Confirmar contraseña",
+  "signup.button.create": "Crear cuenta",
+  "signup.button.loading": "Creando cuenta...",
+  "signup.dividerOr": "o",
+  "signup.alreadyAccountText": "¿Ya tienes cuenta?",
+  "signup.loginText": "Iniciar sesión",
+
+  "signup.error.nameRequired": "El nombre es requerido",
+  "signup.error.lastNameRequired": "El apellido es requerido",
+  "signup.error.emailRequired": "Correo válido es requerido",
+  "signup.error.birthdateRequired": "La fecha de nacimiento es requerida",
+  "signup.error.passwordInvalid": "La contraseña debe tener al menos 6 caracteres",
+  "signup.error.passwordMismatch": "Las contraseñas no coinciden",
+  "signup.error.validationTitle": "Error de validación",
+  "signup.error.validationMessage": "Por favor corrige los campos resaltados.",
+  "signup.error.registrationFailedTitle": "Registro fallido",
+  "signup.error.registrationFailedMessage": "Ocurrió un error durante el registro.",
+
+  "signup.success.accountCreatedTitle": "Cuenta creada",
+  "signup.success.accountCreatedMessage": "¡Tu cuenta fue creada exitosamente! Ya puedes iniciar sesión.",
+    "addresses.headerTitle": "Dirección de entrega",
+  "addresses.addButton": "Añadir dirección",
+  "addresses.noAddresses": "No tienes direcciones guardadas.",
+  "addresses.noType": "Sin tipo",
+   "selectAddress.headerAdd": "Agregar nueva dirección",
+  "selectAddress.headerEdit": "Editar dirección",
+  "selectAddress.searchPlaceholder": "Dirección*",
+  "selectAddress.floorLabel": "Piso / Depto",
+  "selectAddress.floorPlaceholder": "Ej: 3B",
+  "selectAddress.commentsLabel": "Comentarios",
+  "selectAddress.commentsPlaceholder": "Ej: No anda el timbre",
+  "selectAddress.typeHome": "Casa",
+  "selectAddress.typeWork": "Trabajo",
+  "selectAddress.typeOther": "Otro",
+  "selectAddress.buttonSave": "Guardar dirección",
+  "selectAddress.buttonUpdate": "Actualizar dirección",
+  "selectAddress.errorSave": "No se pudo guardar la dirección.",
+   "productDetail.errorTitle": "Error",
+  "productDetail.errorLoadIngredients": "No se pudieron cargar los ingredientes. Intenta nuevamente.",
+  "productDetail.loading": "Cargando detalles del producto...",
+  "productDetail.toastAddedTitle": "Producto agregado",
+  "productDetail.toastAddedMessage": "{{name}} se agregó al carrito.",
+  "productDetail.optionSimple": "Simple",
+  "productDetail.optionDouble": "Doble",
+  "productDetail.sectionIncluded": "Ingredientes incluidos",
+  "productDetail.sectionExtras": "Ingredientes extra",
+  "productDetail.buttonAdded": "¡Agregado!",
+  "productDetail.buttonAdd": "Agregar ${{price}}",
+  "cart.headerTitle": "Mi carrito",
+  "cart.ingredientsIncluded": "Ingredientes incluidos:",
+  "cart.ingredientsExtra": "Ingredientes extra:",
+  "cart.empty": "Tu carrito está vacío",
+  "cart.total": "Total",
+  "cart.checkout": "Proceder al pago",
+  "firstAddress.headerTitle": "Agrega tu primera dirección",
+  "firstAddress.headerSubtitle": "Debes agregar una dirección para comenzar",
+  "firstAddress.placeholder": "Dirección*",
+  "firstAddress.floorPlaceholder": "Piso / Depto (p.ej., 3B)",
+  "firstAddress.commentsPlaceholder": "Comentarios (p.ej., Timbre no funciona, llamar)",
+  "firstAddress.home": "Casa",
+  "firstAddress.work": "Trabajo",
+  "firstAddress.other": "Otro",
+  "firstAddress.saveButton": "Guardar dirección",
+  "firstAddress.errorSaving": "Hubo un problema al guardar la dirección.",
+  "orders": {
+    "headerTitle": "Mis pedidos",
+    "searchPlaceholder": "Buscar por código de pedido o dirección...",
+    "filter": {
+      "all": "Todos",
+      "active": "Activos",
+      "finished": "Finalizados"
+    },
+    "empty": {
+      "title": "No se encontraron pedidos",
+      "subtitle": "Intenta ajustar tus filtros"
+    },
+    "modal": {
+      "title": "Detalles del pedido",
+      "close": "Cerrar",
+      "productsTitle": "Productos"
+    },
+    "details": {
+      "orderCode": "Código de pedido",
+      "address": "Dirección",
+      "date": "Fecha",
+      "total": "Total",
+      "status": "Estado"
+    },
+    "noCode": "Sin código"
+  },
+  "orderTracking": {
+    "headerTitle": "Seguimiento de pedido",
+    "errorNotFound": "Pedido no encontrado o ya no está activo.",
+    "detailsTitle": "Resumen de pedido",
+    "label": {
+      "orderCode": "Código de pedido",
+      "subtotal": "Subtotal",
+      "delivery": "Envío",
+      "total": "Total"
+    },
+    "itemsTitle": "Artículos",
+    "emptyItems": "No se encontraron productos para este pedido.",
+    "button": {
+      "backHome": "Volver al inicio"
+    }
+  },
+  "payment": {
+    "header": "Estado del pago",
+    "loadingTitle": "Verificando pago...",
+    "loadingSubtitle": "Por favor espera mientras procesamos tu transacción",
+    "pendingTitle": "Pago pendiente ⏳",
+    "pendingSubtitle": "Actualizaremos esta pantalla automáticamente cuando se confirme el pago.",
+    "failedTitle": "Pago fallido ❌",
+    "failedSubtitle": "Por favor intenta de nuevo o elige otro método.",
+    "tryAgain": "Intentar de nuevo",
+    "successTitle": "Pago exitoso ✅",
+    "successSubtitle": "Tu pedido ha sido confirmado y está en proceso.",
+    "backHome": "Volver al inicio"
+  },
+  "profile": {
+    "greeting": "Bienvenido de nuevo,",
+    "sections": {
+      "personalInfo": "Información personal",
+      "addresses": "Direcciones",
+      "terms": "Términos y condiciones",
+      "support": "Ayuda y soporte"
+    },
+    "toggleLanguage": "Cambiar a Español",
+    "logout": "Cerrar sesión"
+  },
+  "personalInfo": {
+    "headerTitle": "Información personal",
+    "labels": {
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "phone": "Teléfono"
+    },
+    "placeholders": {
+      "name": "Ingresa tu nombre",
+      "email": "Ingresa tu correo electrónico",
+      "phone": "Ingresa tu teléfono"
+    },
+    "save": "Guardar",
+    "deleteAccount": "Eliminar cuenta",
+    "modal": {
+      "title": "Confirmar eliminación",
+      "text": "¿Estás seguro de que deseas eliminar tu cuenta? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    },
+    "toasts": {
+      "updated": "Datos actualizados",
+      "errorUpdating": "Error al actualizar datos",
+      "deleted": "Cuenta eliminada"
+    }
+  }
+}

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// views/Pedidos.jsx
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,320 +11,338 @@ import {
   Image,
   Modal,
   FlatList,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { useSelector } from "react-redux";
+import { useNavigation } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 
-/* Helper: Returns card style based on status */
-function getCardStyleByStatus(status) {
-  const lowerStatus = status?.toLowerCase();
-  switch (lowerStatus) {
-    case 'pendiente':
-      return { backgroundColor: '#FEF9C3' }; // very light yellow
-    case 'aceptada':
-      return { backgroundColor: '#DCFCE7' }; // light green
-    case 'envio':
-      return { backgroundColor: '#E0F2FE' }; // light blue
-    case 'finalizada':
-      return { backgroundColor: '#F3F4F6' }; // light gray
-    case 'rechazada':
-    case 'cancelada':
-      return { backgroundColor: '#FEE2E2' }; // light red
+/* Helpers de color según estado */
+const getCardStyleByStatus = (status) => {
+  const s = status?.toLowerCase();
+  switch (s) {
+    case "pendiente":
+      return { backgroundColor: "#FFF9DB", borderLeftColor: "#FFC107" };
+    case "aceptada":
+      return { backgroundColor: "#E6F7EC", borderLeftColor: "#10B981" };
+    case "envio":
+      return { backgroundColor: "#E1F0FF", borderLeftColor: "#3B82F6" };
+    case "finalizada":
+      return { backgroundColor: "#F9FAFB", borderLeftColor: "#6B7280" };
+    case "rechazada":
+    case "cancelada":
+      return { backgroundColor: "#FEF2F2", borderLeftColor: "#EF4444" };
     default:
-      return { backgroundColor: '#FFFFFF' };
+      return { backgroundColor: "#FFFFFF", borderLeftColor: "#E5E7EB" };
   }
-}
+};
+const getStatusBadgeStyle = (status) => {
+  const s = status?.toLowerCase();
+  switch (s) {
+    case "pendiente":
+      return { backgroundColor: "#FFF9DB", color: "#B45309" };
+    case "aceptada":
+      return { backgroundColor: "#E6F7EC", color: "#047857" };
+    case "envio":
+      return { backgroundColor: "#E1F0FF", color: "#1D4ED8" };
+    case "finalizada":
+      return { backgroundColor: "#F9FAFB", color: "#4B5563" };
+    case "rechazada":
+    case "cancelada":
+      return { backgroundColor: "#FEF2F2", color: "#B91C1C" };
+    default:
+      return { backgroundColor: "#F3F4F6", color: "#374151" };
+  }
+};
 
-export default function Orders() {
+/* Helpers varios */
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+const safeDate = (value) => {
+  const d = new Date(value);
+  return isNaN(d) ? "—" : d.toISOString().split("T")[0];
+};
+
+export default function Pedidos() {
   const navigation = useNavigation();
+  const { historicOrders, activeOrders } = useSelector((s) => s.order);
+  const { t, i18n } = useTranslation();
+  const currentLang = useSelector((s) => s.user.language);
 
-  // State for search and filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  useEffect(() => {
+    if (currentLang) i18n.changeLanguage(currentLang);
+  }, [currentLang]);
 
-  // Modal state
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  /* Estado búsqueda / filtros */
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+
+  /* Opciones de filtros */
+  const filterOptions = [
+    { key: "all", labelKey: "orders.filter.all" },
+    { key: "active", labelKey: "orders.filter.active" },
+    { key: "finished", labelKey: "orders.filter.finished" },
+  ];
+
+  /* Estado modal */
+  const [selected, setSelected] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const historicOrders = useSelector((state) => state.order.historicOrders);
+  /* Mezcla listas sin duplicar */
+  const allOrders = [
+    ...historicOrders,
+    ...activeOrders.filter((a) => !historicOrders.some((h) => h.id === a.id)),
+  ];
 
-  // Filter and search function
-  function applyFilters() {
-    let orders = [...historicOrders];
-
-    // Filter by status
-    if (filterStatus === 'active') {
-      orders = orders.filter(
-        (o) =>
-          !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
+  /* Aplicar filtros y búsqueda */
+  const filtered = allOrders
+    .filter((o) => {
+      const st = o.status?.toLowerCase();
+      if (filter === "active")
+        return !["finalizada", "rechazada", "cancelada"].includes(st);
+      if (filter === "finished")
+        return ["finalizada", "rechazada", "cancelada"].includes(st);
+      return true;
+    })
+    .filter((o) => {
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        o.code?.toLowerCase().includes(q) ||
+        o.deliveryAddress?.toLowerCase().includes(q)
       );
-    } else if (filterStatus === 'finished') {
-      orders = orders.filter((o) =>
-        ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
-      );
-    }
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    // Search by order code or delivery address
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      orders = orders.filter((order) => {
-        const codeMatch = order.code?.toLowerCase().includes(query);
-        const addressMatch = order.deliveryAddress?.toLowerCase().includes(query);
-        return codeMatch || addressMatch;
-      });
-    }
-
-    return orders;
-  }
-
-  const filteredOrders = applyFilters();
-
-  // Separate active and finished orders (for "all" view)
-  const activeOrders = filteredOrders.filter(
-    (o) => !['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
-  );
-  const finishedOrders = filteredOrders.filter((o) =>
-    ['finalizada', 'rechazada', 'cancelada'].includes(o.status?.toLowerCase())
-  );
-
-  // Modal functions
-  const openModal = (order) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
-  const closeModal = () => {
-    setSelectedOrder(null);
-    setModalVisible(false);
-  };
-
-  // Navigate to order tracking if active, otherwise open modal for finished orders
+  /* Pulsar tarjeta */
   const handlePress = (order) => {
-    const lowerStatus = order.status?.toLowerCase();
-    if (['finalizada', 'rechazada', 'cancelada'].includes(lowerStatus)) {
-      openModal(order);
+    const st = order.status?.toLowerCase();
+    if (["finalizada", "rechazada", "cancelada"].includes(st)) {
+      setSelected(order);
+      setModalVisible(true);
     } else {
-      navigation.navigate('OrderTracking', { orderId: order.id });
+      navigation.navigate("OrderTracking", { orderId: order.id });
     }
   };
 
-  // Simple date format: YYYY-MM-DD
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  };
+  /* Renderiza una tarjeta de orden */
+  const renderOrderCard = (order) => (
+    <TouchableOpacity
+      key={order.id}
+      style={[styles.card, getCardStyleByStatus(order.status)]}
+      onPress={() => handlePress(order)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.imgBox}>
+        <Image
+          source={{ uri: "/placeholder.svg?height=80&width=80" }}
+          style={styles.img}
+        />
+      </View>
+      <View style={styles.info}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.title}>{order.code || t("orders.noCode")}</Text>
+          <Text style={styles.date}>{safeDate(order.createdAt)}</Text>
+        </View>
+        <Text style={styles.address} numberOfLines={1}>
+          <Icon name="map-marker" size={14} color="#6B7280" />{" "}
+          {order.deliveryAddress}
+        </Text>
+        <View style={styles.rowBetween}>
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor: getStatusBadgeStyle(order.status).backgroundColor,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeText,
+                { color: getStatusBadgeStyle(order.status).color },
+              ]}
+            >
+              {cap(order.status)}
+            </Text>
+          </View>
+          <Text style={styles.total}>${order.finalPrice}</Text>
+        </View>
+      </View>
+      <Icon name="chevron-right" size={20} color="#9CA3AF" style={styles.chevron} />
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
+      {/* ENCABEZADO */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Orders</Text>
-        <View style={styles.filterButton}>
-          <Icon name="tune-vertical" size={24} color="#D32F2F" />
+        <Text style={styles.headerTitle}>{t("orders.headerTitle")}</Text>
+        <TouchableOpacity style={styles.filterIcon}>
+          <Icon name="tune-vertical" size={22} color="#E53935" />
+        </TouchableOpacity>
+      </View>
+
+      {/* BÚSQUEDA */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBox}>
+          <Icon name="magnify" size={20} color="#9CA3AF" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t("orders.searchPlaceholder")}
+            placeholderTextColor="#9CA3AF"
+            value={query}
+            onChangeText={setQuery}
+          />
+          {!!query && (
+            <TouchableOpacity onPress={() => setQuery("")}>
+              <Icon name="close-circle" size={16} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* SEARCH BAR */}
-      <View style={styles.searchContainer}>
-        <Icon name="magnify" size={24} color="#9CA3AF" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search orders..."
-          placeholderTextColor="#9CA3AF"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* STATUS FILTER */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterOption,
-            filterStatus === 'all' && styles.filterOptionActive,
-          ]}
-          onPress={() => setFilterStatus('all')}
-        >
-          <Text
+      {/* FILTROS */}
+      <View style={styles.filters}>
+        {filterOptions.map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
             style={[
-              styles.filterOptionText,
-              filterStatus === 'all' && styles.filterOptionTextActive,
+              styles.filterBtn,
+              filter === opt.key && styles.filterBtnActive,
             ]}
+            onPress={() => setFilter(opt.key)}
           >
-            All
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterOption,
-            filterStatus === 'active' && styles.filterOptionActive,
-          ]}
-          onPress={() => setFilterStatus('active')}
-        >
-          <Text
-            style={[
-              styles.filterOptionText,
-              filterStatus === 'active' && styles.filterOptionTextActive,
-            ]}
-          >
-            Active
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterOption,
-            filterStatus === 'finished' && styles.filterOptionActive,
-          ]}
-          onPress={() => setFilterStatus('finished')}
-        >
-          <Text
-            style={[
-              styles.filterOptionText,
-              filterStatus === 'finished' && styles.filterOptionTextActive,
-            ]}
-          >
-            Finished
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ORDERS LIST */}
-      <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-        {filterStatus !== 'all' &&
-          filteredOrders.map((order) => (
-            <TouchableOpacity
-              key={order.id}
-              style={[styles.orderItem, getCardStyleByStatus(order.status)]}
-              onPress={() => handlePress(order)}
+            <Text
+              style={[
+                styles.filterText,
+                filter === opt.key && styles.filterTextActive,
+              ]}
             >
-              <Image
-                source={{ uri: '/placeholder.svg?height=80&width=80' }}
-                style={styles.orderImage}
-              />
-              <View style={styles.orderInfo}>
-                <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
-                <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
-                <Text style={styles.orderStatus}>{order.status}</Text>
-                <View style={styles.orderFooter}>
-                  <Text style={styles.orderTotal}>${order.finalPrice}</Text>
-                </View>
-              </View>
-              <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-            </TouchableOpacity>
-          ))}
+              {t(opt.labelKey)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {filterStatus === 'all' && (
-          <>
-            {/* ACTIVE ORDERS */}
-            {activeOrders.length > 0 && (
-              <Text style={styles.sectionTitle}>Active Orders</Text>
-            )}
-            {activeOrders.map((order) => (
-              <TouchableOpacity
-                key={order.id}
-                style={[styles.orderItem, getCardStyleByStatus(order.status)]}
-                onPress={() => handlePress(order)}
-              >
-                <Image
-                  source={{ uri: '/placeholder.svg?height=80&width=80' }}
-                  style={styles.orderImage}
-                />
-                <View style={styles.orderInfo}>
-                  <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
-                  <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
-                  <Text style={styles.orderStatus}>{order.status}</Text>
-                  <View style={styles.orderFooter}>
-                    <Text style={styles.orderTotal}>${order.finalPrice}</Text>
-                  </View>
-                </View>
-                <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-              </TouchableOpacity>
-            ))}
-
-            {/* SEPARATOR */}
-            {activeOrders.length > 0 && finishedOrders.length > 0 && (
-              <View style={styles.separator} />
-            )}
-
-            {/* HISTORICAL ORDERS */}
-            {finishedOrders.length > 0 && (
-              <Text style={styles.sectionTitle}>Historical Orders</Text>
-            )}
-            {finishedOrders.map((order) => (
-              <TouchableOpacity
-                key={order.id}
-                style={[styles.orderItem, getCardStyleByStatus(order.status)]}
-                onPress={() => handlePress(order)}
-              >
-                <Image
-                  source={{ uri: '/placeholder.svg?height=80&width=80' }}
-                  style={styles.orderImage}
-                />
-                <View style={styles.orderInfo}>
-                  <Text style={styles.orderTitle}>{order.code || 'No code'}</Text>
-                  <Text style={styles.orderAddress}>{order.deliveryAddress}</Text>
-                  <Text style={styles.orderStatus}>{order.status}</Text>
-                  <View style={styles.orderFooter}>
-                    <Text style={styles.orderTotal}>${order.finalPrice}</Text>
-                  </View>
-                </View>
-                <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-              </TouchableOpacity>
-            ))}
-          </>
+      {/* LISTA */}
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {!filtered.length && (
+          <View style={styles.empty}>
+            <Icon name="package-variant" size={60} color="#E5E7EB" />
+            <Text style={styles.emptyText}>{t("orders.empty.title")}</Text>
+            <Text style={styles.emptySub}>{t("orders.empty.subtitle")}</Text>
+          </View>
         )}
+        {filtered.map(renderOrderCard)}
       </ScrollView>
 
-      {/* MODAL FOR ORDER DETAILS (for finished orders) */}
-      {selectedOrder && (
+      {/* MODAL Detalle */}
+      {selected && (
         <Modal
           visible={modalVisible}
+          transparent
           animationType="slide"
-          transparent={true}
-          onRequestClose={closeModal}
+          onRequestClose={() => setModalVisible(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Order Details</Text>
-              <Text style={styles.modalText}>
-                Address: {selectedOrder.deliveryAddress}
-              </Text>
-              <Text style={styles.modalText}>
-                Status:{' '}
-                {selectedOrder.status.charAt(0).toUpperCase() +
-                  selectedOrder.status.slice(1)}
-              </Text>
-              <Text style={styles.modalText}>
-                Total: ${selectedOrder.finalPrice}
-              </Text>
+          <View style={styles.modalBack}>
+            <View style={styles.modalBox}>
+              {/* Encabezado modal */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{t("orders.modal.title")}</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Icon name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
 
-              <Text style={styles.modalSubtitle}>Products:</Text>
+              {/* Info principal */}
+              <View style={styles.modalInfo}>
+                {[
+                  ["orders.details.orderCode", selected.code || t("orders.noCode")],
+                  ["orders.details.address", selected.deliveryAddress],
+                  ["orders.details.date", safeDate(selected.createdAt)],
+                  ["orders.details.total", `$${selected.finalPrice}`],
+                ].map(([key, val]) => (
+                  <View key={key} style={styles.modalInfoRow}>
+                    <Icon
+                      name={
+                        key === "orders.details.total"
+                          ? "cash"
+                          : key === "orders.details.date"
+                          ? "calendar"
+                          : key === "orders.details.address"
+                          ? "map-marker"
+                          : "barcode"
+                      }
+                      size={18}
+                      color="#6B7280"
+                    />
+                    <Text style={styles.modalLabel}>{t(key)}:</Text>
+                    <Text style={styles.modalValue}>{val}</Text>
+                  </View>
+                ))}
+
+                {/* Estado */}
+                <View style={styles.modalInfoRow}>
+                  <Icon name="information-outline" size={18} color="#6B7280" />
+                  <Text style={styles.modalLabel}>{t("orders.details.status")}:</Text>
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: getStatusBadgeStyle(selected.status).backgroundColor,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        { color: getStatusBadgeStyle(selected.status).color },
+                      ]}
+                    >
+                      {cap(selected.status)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Productos */}
+              <Text style={styles.productsHeader}>{t("orders.modal.productsTitle")}</Text>
               <FlatList
-                data={selectedOrder.order_products}
-                keyExtractor={(item) => item.id.toString()}
+                data={selected.order_products}
+                keyExtractor={(i) => i.id.toString()}
                 renderItem={({ item }) => (
-                  <View style={styles.productItem}>
+                  <View style={styles.productRow}>
                     <Image
                       source={{ uri: item.product.img }}
-                      style={styles.productImage}
+                      style={styles.productImg}
                     />
                     <View style={styles.productInfo}>
                       <Text style={styles.productName}>{item.product.name}</Text>
-                      <Text style={styles.productDescription}>
+                      <Text style={styles.productDesc} numberOfLines={2}>
                         {item.product.description}
                       </Text>
-                      <Text style={styles.productPrice}>
-                        ${item.product.price} x {item.quantity}
-                      </Text>
+                      <View style={styles.productPriceRow}>
+                        <Text style={styles.productPrice}>${item.product.price}</Text>
+                        <Text style={styles.productQty}>x {item.quantity}</Text>
+                        <Text style={styles.productTotal}>
+                          ${(item.product.price * item.quantity).toFixed(2)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 )}
+                style={styles.productsList}
               />
 
-              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-                <Text style={styles.closeButtonText}>Close</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalCloseText}>{t("orders.modal.close")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -334,221 +353,119 @@ export default function Orders() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-
-  /* HEADER */
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-  },
-  filterButton: {
+  headerTitle: { fontSize: 22, fontWeight: "700", color: "#111827" },
+  filterIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
-
-  /* SEARCH BAR */
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  searchWrap: {
     paddingHorizontal: 20,
-    marginBottom: 12,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  searchIcon: {
-    position: 'absolute',
-    left: 36,
-    zIndex: 1,
-  },
-  searchInput: {
-    flex: 1,
-    height: 48,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingLeft: 48,
-    paddingRight: 16,
-    fontSize: 16,
-    color: '#000000',
-  },
-
-  /* FILTERS */
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  filterOption: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 4,
-  },
-  filterOptionActive: {
-    backgroundColor: '#D32F2F',
-  },
-  filterOptionText: {
-    fontSize: 14,
-    color: '#D32F2F',
-    fontWeight: '500',
-  },
-  filterOptionTextActive: {
-    color: '#FFFFFF',
-  },
-
-  /* ORDERS LIST */
-  ordersList: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-    marginVertical: 8,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 8,
-  },
-
-  /* ORDER ITEM */
-  orderItem: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  orderImage: {
-    width: 70,
-    height: 70,
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
     borderRadius: 10,
-    marginRight: 16,
+    paddingHorizontal: 12,
   },
-  orderInfo: {
+  searchInput: { flex: 1, height: 44, fontSize: 15, color: "#111827", marginLeft: 8 },
+  filters: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  filterBtn: {
     flex: 1,
-  },
-  orderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  orderAddress: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 4,
-  },
-  orderStatus: {
-    fontSize: 14,
-    color: '#D32F2F',
-    fontWeight: '500',
-    marginBottom: 6,
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  orderTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-  },
-  orderDate: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-
-  /* MODAL */
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-    marginBottom: 16,
-  },
-  modalText: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#000000',
-  },
-  modalSubtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#D32F2F',
-  },
-  productItem: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  productImage: {
-    width: 60,
-    height: 60,
+    paddingVertical: 8,
+    marginHorizontal: 4,
     borderRadius: 8,
-    marginRight: 16,
+    backgroundColor: "#F9FAFB",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  productDescription: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 14,
-    color: '#D32F2F',
-  },
-  closeButton: {
-    marginTop: 16,
-    backgroundColor: '#D32F2F',
+  filterBtnActive: { backgroundColor: "#E53935", borderColor: "#E53935" },
+  filterText: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
+  filterTextActive: { color: "#FFFFFF" },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
+  card: {
+    flexDirection: "row",
+    borderRadius: 12,
+    marginBottom: 16,
     padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2.5,
+    elevation: 2,
+    borderLeftWidth: 4,
   },
-  closeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+  imgBox: { marginRight: 12 },
+  img: { width: 60, height: 60, borderRadius: 8 },
+  info: { flex: 1 },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  title: { fontSize: 16, fontWeight: "700", color: "#111827", flex: 1 },
+  date: { fontSize: 12, color: "#6B7280" },
+  address: { fontSize: 14, color: "#4B5563", marginBottom: 8 },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  badgeText: { fontSize: 12, fontWeight: "600" },
+  total: { fontSize: 16, fontWeight: "700", color: "#E53935" },
+  chevron: { alignSelf: "center", marginLeft: 8 },
+  empty: { alignItems: "center", paddingVertical: 60 },
+  emptyText: { fontSize: 18, fontWeight: "600", color: "#6B7280", marginTop: 16 },
+  emptySub: { fontSize: 14, color: "#9CA3AF", marginTop: 4 },
+  modalBack: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+  modalBox: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "82%",
   },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  modalTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  modalInfo: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 16, marginBottom: 20 },
+  modalInfoRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  modalLabel: { fontSize: 14, fontWeight: "600", color: "#4B5563", marginLeft: 8, width: 90 },
+  modalValue: { fontSize: 14, color: "#111827", flex: 1 },
+  productsHeader: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
+  productsList: { maxHeight: 300 },
+  productRow: { flexDirection: "row", backgroundColor: "#F9FAFB", borderRadius: 12, padding: 12, marginBottom: 16 },
+  productImg: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
+  productInfo: { flex: 1 },
+  productName: { fontSize: 16, fontWeight: "600", color: "#111827", marginBottom: 4 },
+  productDesc: { fontSize: 14, color: "#4B5563", marginBottom: 8 },
+  productPriceRow: { flexDirection: "row", alignItems: "center" },
+  productPrice: { fontSize: 14, color: "#111827" },
+  productQty: { fontSize: 14, color: "#6B7280", marginHorizontal: 8 },
+  productTotal: { fontSize: 14, fontWeight: "600", color: "#E53935", marginLeft: "auto" },
+  modalCloseBtn: { marginTop: 16, backgroundColor: "#E53935", padding: 14, borderRadius: 10, alignItems: "center" },
+  modalCloseText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
 });
